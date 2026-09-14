@@ -7,7 +7,7 @@ export const UNTRUSTED_BOUNDARY_END = '<<</UNTRUSTED_DOCUMENT_CONTENT>>>';
 
 // Known adversarial patterns attempting to hijack system instructions
 const INJECTION_PATTERNS = [
-  /ignore\s+(all\s+)?(previous|prior|above)\s+instructions/gi,
+  /(ignore|disregard)\s+(all\s+)?(previous|prior|above)\s+instructions/gi,
   /you\s+are\s+now\s+(a|an)\s+[a-z\s]+/gi,
   /disregard\s+(system\s+)?prompt/gi,
   /reveal\s+(your\s+)?(system\s+prompt|api\s*key|hidden\s+rules)/gi,
