@@ -1,0 +1,145 @@
+export type RiskCategory =
+  | 'termination'
+  | 'payment'
+  | 'liability'
+  | 'renewal'
+  | 'confidentiality'
+  | 'privacy/data'
+  | 'dispute resolution'
+  | 'restrictive covenants'
+  | 'penalties'
+  | 'unusual obligations';
+
+export type RiskSeverity = 'high' | 'medium' | 'low' | 'informational';
+
+export interface SourceReference {
+  section: string;
+  pageOrRef?: string;
+  exactQuote: string;
+  confidence: number; // 0 to 100
+}
+
+export interface LegalRisk {
+  id: string;
+  category: RiskCategory;
+  severity: RiskSeverity;
+  title: string;
+  explanation: string;
+  sourceSection: string;
+  pageOrRef?: string;
+  quote: string;
+  confidence: number; // 0 to 100
+  reviewRecommendation: string;
+  suggestedQuestionForLawyer: string;
+}
+
+export interface ImportantClause {
+  id: string;
+  title: string;
+  category: string;
+  originalText: string;
+  plainEnglishTranslation: string;
+  sourceSection: string;
+  pageOrRef?: string;
+  severity: RiskSeverity;
+  confidence: number;
+  suggestedAction: string;
+}
+
+export interface LegalObligation {
+  id: string;
+  party: string;
+  description: string;
+  deadline?: string;
+  isRecurring: boolean;
+  frequency?: string;
+  consequences?: string;
+  sourceSection: string;
+}
+
+export interface ActionItem {
+  id: string;
+  priority: 'high' | 'medium' | 'low';
+  action: string;
+  timeline?: string;
+  category: string;
+  suggestedQuestionsForLawyer: string[];
+  documentsToGather?: string[];
+  status?: 'pending' | 'in_progress' | 'completed';
+}
+
+export interface ConsultationBrief {
+  documentPurpose: string;
+  parties: { name: string; role: string }[];
+  governingLawAndJurisdiction: string;
+  keyBusinessTerms: string[];
+  highPriorityConcerns: string[];
+  questionsForCounsel: { topic: string; question: string; rationale: string }[];
+  relevantSectionsToHighlight: string[];
+  disclaimerNotice: string;
+}
+
+export interface LegalDocument {
+  id: string;
+  title: string;
+  fileName: string;
+  fileType: 'pdf' | 'docx' | 'txt' | 'md';
+  fileSize: number;
+  uploadedAt: string;
+  rawText: string;
+  documentType: string;
+  parties: { name: string; role: string }[];
+  effectiveDate?: string;
+  expirationDate?: string;
+  jurisdiction?: string;
+  plainLanguageSummary: string;
+  keyDates: { label: string; date: string; isCritical: boolean }[];
+  clauses: ImportantClause[];
+  obligations: LegalObligation[];
+  risks: LegalRisk[];
+  actionItems: ActionItem[];
+  consultationBrief: ConsultationBrief;
+  tags?: string[];
+}
+
+export interface GroundedEvidence {
+  quote: string;
+  section: string;
+  confidence: number;
+}
+
+export interface AskDocumentResponse {
+  question: string;
+  answer: string;
+  groundedEvidence: GroundedEvidence[];
+  notFoundInDocument: boolean;
+  missingInformationNotice?: string;
+  suggestedFollowUpQuestions: string[];
+  safetyDisclaimer: string;
+}
+
+export interface ComparisonItemChange {
+  title: string;
+  category: string;
+  docAContent: string;
+  docBContent: string;
+  riskImpact: 'increases_risk' | 'decreases_risk' | 'neutral';
+  explanation: string;
+  recommendation: string;
+}
+
+export interface ComparisonResult {
+  docA: { id: string; title: string };
+  docB: { id: string; title: string };
+  executiveSummary: string;
+  overallRiskShift: 'higher_for_user' | 'lower_for_user' | 'balanced_shift';
+  additions: string[];
+  removals: string[];
+  changedClauses: ComparisonItemChange[];
+  changedDates: { description: string; docA: string; docB: string }[];
+  changedFinancialObligations: { description: string; docA: string; docB: string }[];
+  changedTerminationRights: { description: string; docA: string; docB: string }[];
+  changedLiabilityProvisions: { description: string; docA: string; docB: string }[];
+  changedRenewalProvisions: { description: string; docA: string; docB: string }[];
+  actionItemsForReview: string[];
+}
