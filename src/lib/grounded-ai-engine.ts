@@ -428,135 +428,17 @@ export async function askDocumentQuestion(
   return askQuestionWithGrounding(document, question);
 }
 
+import { compareDocumentsSemantically } from './comparison';
+
 /**
  * Contract Comparison Engine
- * Detects additions, removals, changed clauses, financial obligations, dates,
- * termination rights, liability provisions, and renewal provisions.
+ * Detects semantic deltas across 9 legal dimensions:
+ * changed terms, dates, obligations, payment, termination, liability,
+ * renewal, confidentiality, and dispute provisions.
  */
 export function compareLegalDocuments(
   docA: LegalDocument,
   docB: LegalDocument
 ): ComparisonResult {
-  const changedClauses: ComparisonItemChange[] = [];
-  const additions: string[] = [];
-  const removals: string[] = [];
-  const changedDates: { description: string; docA: string; docB: string }[] = [];
-  const changedFinancialObligations: { description: string; docA: string; docB: string }[] = [];
-  const changedTerminationRights: { description: string; docA: string; docB: string }[] = [];
-  const changedLiabilityProvisions: { description: string; docA: string; docB: string }[] = [];
-  const changedRenewalProvisions: { description: string; docA: string; docB: string }[] = [];
-
-  // Compare Jurisdiction
-  if (docA.jurisdiction !== docB.jurisdiction) {
-    changedClauses.push({
-      title: 'Governing Law and Jurisdiction Shift',
-      category: 'Dispute Resolution',
-      docAContent: docA.jurisdiction || 'Not specified',
-      docBContent: docB.jurisdiction || 'Not specified',
-      riskImpact: 'increases_risk',
-      explanation: `Governing law was changed from ${docA.jurisdiction} to ${docB.jurisdiction}. Changing legal jurisdiction impacts which statutory protections apply.`,
-      recommendation: 'Verify with counsel licensed in the newly specified jurisdiction.',
-    });
-  }
-
-  // Compare Liability
-  const liabilityA = docA.clauses.find((c) => c.category.toLowerCase().includes('liability')) ||
-    docA.risks.find((r) => r.category === 'liability');
-  const liabilityB = docB.clauses.find((c) => c.category.toLowerCase().includes('liability')) ||
-    docB.risks.find((r) => r.category === 'liability');
-
-  if (liabilityA || liabilityB) {
-    changedLiabilityProvisions.push({
-      description: 'Limitation of Liability Terms',
-      docA: liabilityA ? (liabilityA as LegalRisk).explanation || (liabilityA as ImportantClause).originalText : 'Standard mutual terms',
-      docB: liabilityB ? (liabilityB as LegalRisk).explanation || (liabilityB as ImportantClause).originalText : 'Not detected in Document B',
-    });
-  }
-
-  // Compare Renewal
-  const renewalA = docA.clauses.find((c) => c.category.toLowerCase().includes('renewal')) ||
-    docA.risks.find((r) => r.category === 'renewal');
-  const renewalB = docB.clauses.find((c) => c.category.toLowerCase().includes('renewal')) ||
-    docB.risks.find((r) => r.category === 'renewal');
-
-  if (renewalA || renewalB) {
-    changedRenewalProvisions.push({
-      description: 'Term and Renewal Notice Period',
-      docA: renewalA ? (renewalA as LegalRisk).explanation || (renewalA as ImportantClause).originalText : 'Standard term',
-      docB: renewalB ? (renewalB as LegalRisk).explanation || (renewalB as ImportantClause).originalText : 'Modified renewal terms',
-    });
-  }
-
-  // Compare Dates
-  changedDates.push({
-    description: 'Effective and Expiration Dates',
-    docA: `Effective: ${docA.effectiveDate || 'N/A'}, Expires: ${docA.expirationDate || 'N/A'}`,
-    docB: `Effective: ${docB.effectiveDate || 'N/A'}, Expires: ${docB.expirationDate || 'N/A'}`,
-  });
-
-  // Synthesize comparison findings
-  if (docB.title.toLowerCase().includes('redline') || docB.title.toLowerCase().includes('v2')) {
-    additions.push('Added unilateral confidentiality obligations extending duration to 10 years.');
-    additions.push('Added $100,000 liquidated damages penalty for alleged breaches.');
-    removals.push('Removed reciprocal confidentiality duty for counterparty disclosures.');
-    removals.push('Removed prevailing party legal fee reimbursement provision.');
-
-    changedFinancialObligations.push({
-      description: 'Liquidated Damages Clause',
-      docA: 'No liquidated damages; actual proven damages only with mutual attorney fee shifting.',
-      docB: '$100,000 automatic liquidated damages per violation clause added.',
-    });
-
-    changedTerminationRights.push({
-      description: 'Post-Termination Survival Period',
-      docA: '3-year confidentiality survival post-term.',
-      docB: '10-year confidentiality survival post-term.',
-    });
-
-    changedClauses.push({
-      title: 'Conversion from Mutual to Unilateral NDA',
-      category: 'Confidentiality',
-      docAContent: 'Mutual two-way protection standard for both parties.',
-      docBContent: 'Unilateral one-way protection obligating only receiving party.',
-      riskImpact: 'increases_risk',
-      explanation: 'The redline strips reciprocal protection for your proprietary disclosures while expanding counterparty remedies.',
-      recommendation: 'Reject unilateral structure and insist on restoring standard mutual protections.',
-    });
-  } else {
-    additions.push(`Provisions unique to ${docB.title}: ${docB.documentType} operational covenants.`);
-    removals.push(`Provisions present only in ${docA.title}: ${docA.documentType} specific terms.`);
-  }
-
-  const highRisksB = docB.risks.filter((r) => r.severity === 'high').length;
-  const highRisksA = docA.risks.filter((r) => r.severity === 'high').length;
-  let overallRiskShift: 'higher_for_user' | 'lower_for_user' | 'balanced_shift' = 'balanced_shift';
-
-  if (docB.title.toLowerCase().includes('redline') || docB.title.toLowerCase().includes('v2') || highRisksB > highRisksA) {
-    overallRiskShift = 'higher_for_user';
-  } else if (highRisksA > highRisksB) {
-    overallRiskShift = 'lower_for_user';
-  }
-
-  return {
-    docA: { id: docA.id, title: docA.title },
-    docB: { id: docB.id, title: docB.title },
-    executiveSummary: `Comparative analysis of "${docA.title}" vs "${docB.title}". ${
-      overallRiskShift === 'higher_for_user'
-        ? 'Document B exhibits a higher AI-identified review priority, with increased risk shifts regarding remedies, duration, or covenants.'
-        : 'The two documents demonstrate distinct contractual profiles with balanced obligations.'
-    }`,
-    overallRiskShift,
-    additions,
-    removals,
-    changedClauses,
-    changedDates,
-    changedFinancialObligations,
-    changedTerminationRights,
-    changedLiabilityProvisions,
-    changedRenewalProvisions,
-    actionItemsForReview: [
-      'Compare redline markup with internal playbook prior to executing version B.',
-      'Seek legal advice regarding any asymmetric liability or penalty provisions.',
-    ],
-  };
+  return compareDocumentsSemantically(docA, docB);
 }

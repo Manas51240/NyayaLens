@@ -118,6 +118,34 @@ export interface AskDocumentResponse {
   safetyDisclaimer: string;
 }
 
+export type ReviewPriority = 'high' | 'medium' | 'low' | 'neutral';
+
+export interface SemanticDeltaItem {
+  id: string;
+  category: 'changed_terms' | 'dates' | 'obligations' | 'payment' | 'termination' | 'liability' | 'renewal' | 'confidentiality' | 'dispute_provisions';
+  title: string;
+  description: string;
+  docAContent: string;
+  docBContent: string;
+  sourceRefA?: string;
+  sourceRefB?: string;
+  quoteA?: string;
+  quoteB?: string;
+  reviewPriority: ReviewPriority;
+  objectiveExplanation: string;
+  counselDiscussionPrompt?: string;
+}
+
+export interface ComparisonCategoryDelta {
+  category: 'changed_terms' | 'dates' | 'obligations' | 'payment' | 'termination' | 'liability' | 'renewal' | 'confidentiality' | 'dispute_provisions';
+  categoryLabel: string;
+  hasDeltas: boolean;
+  deltaCount: number;
+  maxReviewPriority: ReviewPriority;
+  summary: string;
+  items: SemanticDeltaItem[];
+}
+
 export interface ComparisonItemChange {
   title: string;
   category: string;
@@ -126,6 +154,9 @@ export interface ComparisonItemChange {
   riskImpact: 'increases_risk' | 'decreases_risk' | 'neutral';
   explanation: string;
   recommendation: string;
+  sourceRefA?: string;
+  sourceRefB?: string;
+  reviewPriority?: ReviewPriority;
 }
 
 export interface ComparisonResult {
@@ -133,13 +164,26 @@ export interface ComparisonResult {
   docB: { id: string; title: string };
   executiveSummary: string;
   overallRiskShift: 'higher_for_user' | 'lower_for_user' | 'balanced_shift';
+  reviewPrioritySummary: 'high_review_priority' | 'medium_review_priority' | 'routine_variations';
   additions: string[];
   removals: string[];
   changedClauses: ComparisonItemChange[];
-  changedDates: { description: string; docA: string; docB: string }[];
-  changedFinancialObligations: { description: string; docA: string; docB: string }[];
-  changedTerminationRights: { description: string; docA: string; docB: string }[];
-  changedLiabilityProvisions: { description: string; docA: string; docB: string }[];
-  changedRenewalProvisions: { description: string; docA: string; docB: string }[];
+  changedDates: { description: string; docA: string; docB: string; sourceRefA?: string; sourceRefB?: string }[];
+  changedFinancialObligations: { description: string; docA: string; docB: string; sourceRefA?: string; sourceRefB?: string }[];
+  changedTerminationRights: { description: string; docA: string; docB: string; sourceRefA?: string; sourceRefB?: string }[];
+  changedLiabilityProvisions: { description: string; docA: string; docB: string; sourceRefA?: string; sourceRefB?: string }[];
+  changedRenewalProvisions: { description: string; docA: string; docB: string; sourceRefA?: string; sourceRefB?: string }[];
+  categoryDeltas: {
+    changedTerms: ComparisonCategoryDelta;
+    dates: ComparisonCategoryDelta;
+    obligations: ComparisonCategoryDelta;
+    payment: ComparisonCategoryDelta;
+    termination: ComparisonCategoryDelta;
+    liability: ComparisonCategoryDelta;
+    renewal: ComparisonCategoryDelta;
+    confidentiality: ComparisonCategoryDelta;
+    disputeProvisions: ComparisonCategoryDelta;
+  };
   actionItemsForReview: string[];
+  legalDisclaimer: string;
 }
