@@ -20,6 +20,11 @@ export const Navbar: React.FC = () => {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  // If inside application workspace, AppShell provides the workspace navigation
+  if (pathname.startsWith('/app')) {
+    return null;
+  }
+
   const navLinks = [
     { href: '/app', label: 'Dashboard', icon: FolderOpen },
     { href: '/app/analyze', label: 'Analyze', icon: PlusCircle },

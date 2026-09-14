@@ -1,8 +1,22 @@
 import type { Metadata, Viewport } from 'next';
+import { Inter, Newsreader } from 'next/font/google';
 import './globals.css';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
 import { LegalDisclaimerBanner } from '@/components/common/LegalDisclaimerBanner';
+
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-inter',
+  display: 'swap',
+});
+
+const newsreader = Newsreader({
+  subsets: ['latin'],
+  style: ['normal', 'italic'],
+  variable: '--font-serif',
+  display: 'swap',
+});
 
 export const metadata: Metadata = {
   title: 'NYAYALENS | Grounded AI Legal Document Understanding Platform',
@@ -30,7 +44,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="h-full scroll-smooth">
+    <html lang="en" className={`h-full scroll-smooth ${inter.variable} ${newsreader.variable}`}>
       <body className="min-h-screen flex flex-col bg-slate-50 text-slate-900 selection:bg-amber-100 selection:text-amber-950 font-sans antialiased">
         {/* Skip to Main Content for Accessibility */}
         <a

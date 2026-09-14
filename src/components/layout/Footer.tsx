@@ -1,8 +1,18 @@
+'use client';
+
 import React from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { Scale, ShieldAlert, Lock, HelpCircle } from 'lucide-react';
 
 export const Footer: React.FC = () => {
+  const pathname = usePathname();
+
+  // If inside application workspace, AppShell provides navigation and contextual actions
+  if (pathname.startsWith('/app')) {
+    return null;
+  }
+
   return (
     <footer className="bg-slate-900 text-slate-300 text-sm mt-auto border-t border-slate-800" role="contentinfo">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">

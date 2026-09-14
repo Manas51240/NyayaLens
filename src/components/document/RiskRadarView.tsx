@@ -13,8 +13,12 @@ import {
   ChevronDown,
   ChevronUp,
   AlertTriangle,
-  Info
+  Info,
+  Copy,
+  Check,
+  Search
 } from 'lucide-react';
+import { EvidenceDrawer } from './EvidenceDrawer';
 
 interface RiskRadarViewProps {
   risks: LegalRisk[];
@@ -38,6 +42,8 @@ export const RiskRadarView: React.FC<RiskRadarViewProps> = ({ risks, documentTit
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedSeverity, setSelectedSeverity] = useState<string>('all');
   const [expandedRiskId, setExpandedRiskId] = useState<string | null>(risks[0]?.id || null);
+  const [copiedQuestionId, setCopiedQuestionId] = useState<string | null>(null);
+  const [inspectRisk, setInspectRisk] = useState<LegalRisk | null>(null);
 
   // Group risks by category
   const categoryCounts = ALL_CATEGORIES.reduce<Record<string, number>>((acc, cat) => {
@@ -54,10 +60,17 @@ export const RiskRadarView: React.FC<RiskRadarViewProps> = ({ risks, documentTit
   };
 
   const filteredRisks = risks.filter((r) => {
-    const matchesCategory = selectedCategory === 'all' || r.category.toLowerCase() === selectedCategory.toLowerCase();
+    const matchesCategory =
+      selectedCategory === 'all' || r.category.toLowerCase() === selectedCategory.toLowerCase();
     const matchesSeverity = selectedSeverity === 'all' || r.severity === selectedSeverity;
     return matchesCategory && matchesSeverity;
   });
+
+  const handleCopyQuestion = (id: string, question: string) => {
+    navigator.clipboard.writeText(question);
+    setCopiedQuestionId(id);
+    setTimeout(() => setCopiedQuestionId(null), 2500);
+  };
 
   return (
     <div className="space-y-6">
@@ -74,29 +87,31 @@ export const RiskRadarView: React.FC<RiskRadarViewProps> = ({ risks, documentTit
 
       {/* Visual Radar Metrics Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div
+        <button
           onClick={() => setSelectedSeverity(selectedSeverity === 'high' ? 'all' : 'high')}
-          className={`cursor-pointer p-4 rounded-lg border transition-all ${
+          className={`text-left p-4 rounded-lg border transition-all ${
             selectedSeverity === 'high'
-              ? 'bg-red-50/80 border-red-300 ring-2 ring-red-400/40 shadow-xs'
+              ? 'bg-red-50/90 border-red-300 ring-2 ring-red-400/40 shadow-xs'
               : 'bg-white border-slate-200 hover:border-red-200'
           }`}
+          aria-pressed={selectedSeverity === 'high'}
         >
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-red-700 uppercase tracking-wide">High Priority</span>
             <AlertTriangle className="w-4 h-4 text-red-600" />
           </div>
           <p className="text-2xl font-bold text-slate-900 mt-2">{severityCounts.high}</p>
-          <p className="text-[11px] text-slate-500 mt-0.5">Warrants counsel discussion</p>
-        </div>
+          <p className="text-[11px] text-slate-500 mt-0.5">Warrants counsel review</p>
+        </button>
 
-        <div
+        <button
           onClick={() => setSelectedSeverity(selectedSeverity === 'medium' ? 'all' : 'medium')}
-          className={`cursor-pointer p-4 rounded-lg border transition-all ${
+          className={`text-left p-4 rounded-lg border transition-all ${
             selectedSeverity === 'medium'
-              ? 'bg-amber-50/80 border-amber-300 ring-2 ring-amber-400/40 shadow-xs'
+              ? 'bg-amber-50/90 border-amber-300 ring-2 ring-amber-400/40 shadow-xs'
               : 'bg-white border-slate-200 hover:border-amber-200'
           }`}
+          aria-pressed={selectedSeverity === 'medium'}
         >
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-amber-700 uppercase tracking-wide">Medium Priority</span>
@@ -104,15 +119,16 @@ export const RiskRadarView: React.FC<RiskRadarViewProps> = ({ risks, documentTit
           </div>
           <p className="text-2xl font-bold text-slate-900 mt-2">{severityCounts.medium}</p>
           <p className="text-[11px] text-slate-500 mt-0.5">Operational awareness</p>
-        </div>
+        </button>
 
-        <div
+        <button
           onClick={() => setSelectedSeverity(selectedSeverity === 'low' ? 'all' : 'low')}
-          className={`cursor-pointer p-4 rounded-lg border transition-all ${
+          className={`text-left p-4 rounded-lg border transition-all ${
             selectedSeverity === 'low'
-              ? 'bg-emerald-50/80 border-emerald-300 ring-2 ring-emerald-400/40 shadow-xs'
+              ? 'bg-emerald-50/90 border-emerald-300 ring-2 ring-emerald-400/40 shadow-xs'
               : 'bg-white border-slate-200 hover:border-emerald-200'
           }`}
+          aria-pressed={selectedSeverity === 'low'}
         >
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-emerald-700 uppercase tracking-wide">Low Priority</span>
@@ -120,15 +136,16 @@ export const RiskRadarView: React.FC<RiskRadarViewProps> = ({ risks, documentTit
           </div>
           <p className="text-2xl font-bold text-slate-900 mt-2">{severityCounts.low}</p>
           <p className="text-[11px] text-slate-500 mt-0.5">Standard terms detected</p>
-        </div>
+        </button>
 
-        <div
+        <button
           onClick={() => setSelectedSeverity(selectedSeverity === 'informational' ? 'all' : 'informational')}
-          className={`cursor-pointer p-4 rounded-lg border transition-all ${
+          className={`text-left p-4 rounded-lg border transition-all ${
             selectedSeverity === 'informational'
               ? 'bg-slate-100 border-slate-300 ring-2 ring-slate-400/40 shadow-xs'
               : 'bg-white border-slate-200 hover:border-slate-300'
           }`}
+          aria-pressed={selectedSeverity === 'informational'}
         >
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-700 uppercase tracking-wide">Informational</span>
@@ -136,12 +153,12 @@ export const RiskRadarView: React.FC<RiskRadarViewProps> = ({ risks, documentTit
           </div>
           <p className="text-2xl font-bold text-slate-900 mt-2">{severityCounts.informational}</p>
           <p className="text-[11px] text-slate-500 mt-0.5">Contextual reference</p>
-        </div>
+        </button>
       </div>
 
       {/* 10 Required Categories Distribution Bar */}
-      <div className="bg-white rounded-lg border border-slate-200 p-4 shadow-2xs">
-        <div className="flex items-center justify-between mb-3">
+      <div className="bg-white rounded-lg border border-slate-200 p-4 shadow-2xs space-y-3">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-2">
             <Layers className="w-4 h-4 text-slate-600" />
             <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-800">
@@ -158,7 +175,7 @@ export const RiskRadarView: React.FC<RiskRadarViewProps> = ({ risks, documentTit
           )}
         </div>
 
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-1.5" role="toolbar" aria-label="Risk Categories Filter">
           {ALL_CATEGORIES.map((cat) => {
             const count = categoryCounts[cat] || 0;
             const isSelected = selectedCategory.toLowerCase() === cat.toLowerCase();
@@ -166,17 +183,18 @@ export const RiskRadarView: React.FC<RiskRadarViewProps> = ({ risks, documentTit
               <button
                 key={cat}
                 onClick={() => setSelectedCategory(isSelected ? 'all' : cat)}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium border transition-colors ${
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border transition-colors ${
                   isSelected
                     ? 'bg-slate-900 text-white border-slate-900 shadow-2xs'
                     : count > 0
                     ? 'bg-slate-50 hover:bg-slate-100 text-slate-800 border-slate-200'
                     : 'bg-white text-slate-400 border-slate-100 hover:text-slate-600'
                 }`}
+                aria-pressed={isSelected}
               >
                 <span className="capitalize">{cat}</span>
                 <span
-                  className={`text-[10px] px-1 rounded-full ${
+                  className={`text-[10px] px-1.5 py-0.2 rounded-full ${
                     isSelected ? 'bg-amber-400 text-slate-950 font-bold' : 'bg-slate-200 text-slate-700'
                   }`}
                 >
@@ -190,8 +208,8 @@ export const RiskRadarView: React.FC<RiskRadarViewProps> = ({ risks, documentTit
 
       {/* Filtered Risk Cards List */}
       <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-medium text-slate-500">
+        <div className="flex items-center justify-between text-xs">
+          <span className="font-medium text-slate-500">
             Showing {filteredRisks.length} of {risks.length} identified review items
           </span>
           {(selectedCategory !== 'all' || selectedSeverity !== 'all') && (
@@ -200,7 +218,7 @@ export const RiskRadarView: React.FC<RiskRadarViewProps> = ({ risks, documentTit
                 setSelectedCategory('all');
                 setSelectedSeverity('all');
               }}
-              className="text-xs text-amber-700 hover:text-amber-900 font-medium"
+              className="text-amber-700 hover:text-amber-900 font-medium"
             >
               Clear all filters
             </button>
@@ -208,8 +226,8 @@ export const RiskRadarView: React.FC<RiskRadarViewProps> = ({ risks, documentTit
         </div>
 
         {filteredRisks.length === 0 ? (
-          <div className="p-8 text-center bg-white rounded-lg border border-slate-200 text-sm text-slate-500">
-            No risk findings match the selected filter criteria.
+          <div className="p-8 text-center bg-white rounded-lg border border-slate-200 text-xs sm:text-sm text-slate-500">
+            No risk findings match the selected filter criteria. Try selecting "All" or choosing another category.
           </div>
         ) : (
           filteredRisks.map((risk) => {
@@ -228,7 +246,7 @@ export const RiskRadarView: React.FC<RiskRadarViewProps> = ({ risks, documentTit
                   <div className="space-y-1.5 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <RiskBadge severity={risk.severity} size="sm" />
-                      <span className="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-medium uppercase tracking-wider">
+                      <span className="text-[11px] px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-semibold uppercase tracking-wider">
                         {risk.category}
                       </span>
                       {risk.sourceSection && (
@@ -237,7 +255,7 @@ export const RiskRadarView: React.FC<RiskRadarViewProps> = ({ risks, documentTit
                         </span>
                       )}
                     </div>
-                    <h4 className="text-sm sm:text-base font-semibold text-slate-900">
+                    <h4 className="text-sm sm:text-base font-bold text-slate-900">
                       {risk.title}
                     </h4>
                   </div>
@@ -251,21 +269,30 @@ export const RiskRadarView: React.FC<RiskRadarViewProps> = ({ risks, documentTit
                 </div>
 
                 {isExpanded && (
-                  <div className="px-4 pb-4 pt-1 border-t border-slate-100 space-y-3 text-xs sm:text-sm text-slate-700">
+                  <div className="px-4 pb-4 pt-1 border-t border-slate-100 space-y-3.5 text-xs sm:text-sm text-slate-700">
                     {/* Plain Language Finding Explanation */}
                     <div>
-                      <h5 className="font-semibold text-slate-900 text-xs uppercase tracking-wide mb-1">
+                      <h5 className="font-bold text-slate-900 text-xs uppercase tracking-wide mb-1">
                         Plain-Language Analysis
                       </h5>
                       <p className="leading-relaxed text-slate-800">{risk.explanation}</p>
                     </div>
 
-                    {/* Verifiable Quoted Evidence */}
+                    {/* Verbatim Quoted Evidence */}
                     {risk.quote && (
-                      <div className="bg-slate-50 border border-slate-200 rounded p-3 text-xs font-mono text-slate-800">
-                        <div className="flex items-center gap-1.5 text-slate-500 font-sans font-semibold mb-1">
-                          <Quote className="w-3.5 h-3.5" />
-                          <span>Exact Document Excerpt:</span>
+                      <div className="bg-slate-50 border border-slate-200 rounded p-3 text-xs font-serif text-slate-800">
+                        <div className="flex items-center justify-between font-sans font-semibold text-slate-500 mb-1">
+                          <div className="flex items-center gap-1.5">
+                            <Quote className="w-3.5 h-3.5" />
+                            <span>Exact Document Excerpt:</span>
+                          </div>
+                          <button
+                            onClick={() => setInspectRisk(risk)}
+                            className="text-indigo-600 hover:text-indigo-800 text-[11px] inline-flex items-center gap-1"
+                          >
+                            <Search className="w-3 h-3" />
+                            <span>Inspect in Drawer</span>
+                          </button>
                         </div>
                         <blockquote className="italic border-l-2 border-slate-400 pl-2 my-1">
                           "{risk.quote}"
@@ -276,32 +303,46 @@ export const RiskRadarView: React.FC<RiskRadarViewProps> = ({ risks, documentTit
                     {/* Actionable Recommendations & Questions for Counsel */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
                       {risk.reviewRecommendation && (
-                        <div className="bg-amber-50/60 border border-amber-200/80 rounded p-2.5">
-                          <span className="font-semibold text-amber-950 text-xs block mb-0.5">
+                        <div className="bg-amber-50/60 border border-amber-200/80 rounded p-3 space-y-1">
+                          <span className="font-bold text-amber-950 text-xs block">
                             Recommended Next Step:
                           </span>
-                          <span className="text-xs text-amber-900 leading-normal">
+                          <p className="text-xs text-amber-900 leading-relaxed">
                             {risk.reviewRecommendation}
-                          </span>
+                          </p>
                         </div>
                       )}
 
                       {risk.suggestedQuestionForLawyer && (
-                        <div className="bg-slate-50 border border-slate-200 rounded p-2.5">
-                          <span className="font-semibold text-slate-900 text-xs block mb-0.5 flex items-center gap-1">
-                            <HelpCircle className="w-3.5 h-3.5 text-slate-600" />
-                            Question for Your Attorney:
-                          </span>
-                          <span className="text-xs text-slate-800 italic leading-normal">
+                        <div className="bg-slate-50 border border-slate-200 rounded p-3 space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-slate-900 text-xs flex items-center gap-1">
+                              <HelpCircle className="w-3.5 h-3.5 text-slate-600" />
+                              Question for Your Attorney:
+                            </span>
+                            <button
+                              onClick={() => handleCopyQuestion(risk.id, risk.suggestedQuestionForLawyer)}
+                              className="text-slate-500 hover:text-slate-800 text-[10px] inline-flex items-center gap-0.5"
+                              title="Copy question"
+                            >
+                              {copiedQuestionId === risk.id ? (
+                                <Check className="w-3 h-3 text-emerald-600" />
+                              ) : (
+                                <Copy className="w-3 h-3" />
+                              )}
+                              <span>{copiedQuestionId === risk.id ? 'Copied' : 'Copy'}</span>
+                            </button>
+                          </div>
+                          <p className="text-xs text-slate-800 italic leading-relaxed">
                             "{risk.suggestedQuestionForLawyer}"
-                          </span>
+                          </p>
                         </div>
                       )}
                     </div>
 
                     <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1">
                       <span>Grounding Confidence: {risk.confidence || 92}%</span>
-                      <span>Verified against document text</span>
+                      <span>Verified against source document text</span>
                     </div>
                   </div>
                 )}
@@ -310,6 +351,21 @@ export const RiskRadarView: React.FC<RiskRadarViewProps> = ({ risks, documentTit
           })
         )}
       </div>
+
+      {/* Evidence Drawer Modal */}
+      {inspectRisk && (
+        <EvidenceDrawer
+          isOpen={true}
+          onClose={() => setInspectRisk(null)}
+          title={inspectRisk.title}
+          category={inspectRisk.category}
+          sourceSection={inspectRisk.sourceSection}
+          pageOrRef={inspectRisk.pageOrRef}
+          quote={inspectRisk.quote}
+          confidence={inspectRisk.confidence}
+          plainTranslation={inspectRisk.explanation}
+        />
+      )}
     </div>
   );
 };

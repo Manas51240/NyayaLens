@@ -16,6 +16,8 @@ import {
 } from 'lucide-react';
 import { getStoredDocuments } from '@/lib/storage';
 import { LegalDocument, ConsultationBrief } from '@/types/legal';
+import { AppShell } from '@/components/layout/AppShell';
+import { EmptyState } from '@/components/common/EmptyState';
 
 function ConsultationContent() {
   const searchParams = useSearchParams();
@@ -47,12 +49,8 @@ function ConsultationContent() {
 
   if (!activeDoc) {
     return (
-      <div className="max-w-4xl mx-auto px-4 py-16 text-center space-y-4">
-        <h2 className="text-xl font-bold text-slate-900">No Documents Available</h2>
-        <p className="text-xs text-slate-500">Analyze a document first to generate a consultation brief.</p>
-        <Link href="/app/analyze" className="text-xs font-semibold text-slate-900 underline">
-          Analyze Document
-        </Link>
+      <div className="py-16">
+        <EmptyState type="empty-binder" />
       </div>
     );
   }
@@ -74,207 +72,216 @@ function ConsultationContent() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 print-page">
-      {/* Control Bar (Hidden on Print) */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-6 no-print">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <Link
-              href={`/app/document/${activeDoc.id}`}
-              className="text-xs text-slate-500 hover:text-slate-800 inline-flex items-center gap-1"
+    <AppShell
+      activeDocumentId={activeDoc.id}
+      breadcrumbs={[
+        { label: 'Documents', href: '/app' },
+        { label: activeDoc.title, href: `/app/document/${activeDoc.id}` },
+        { label: 'Consultation Brief' },
+      ]}
+    >
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 print-page">
+        {/* Control Bar (Hidden on Print) */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-6 no-print">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <Link
+                href={`/app/document/${activeDoc.id}`}
+                className="text-xs text-slate-500 hover:text-slate-800 inline-flex items-center gap-1"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>Back to Document</span>
+              </Link>
+            </div>
+            <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">
+              Legal Professional Consultation Memorandum
+            </h1>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Attorney-ready structured summary to optimize billable consultation time.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {documents.length > 1 && (
+              <select
+                value={selectedDocId}
+                onChange={(e) => setSelectedDocId(e.target.value)}
+                className="text-xs p-2 border border-slate-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-slate-900 font-medium"
+              >
+                {documents.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.title}
+                  </option>
+                ))}
+              </select>
+            )}
+
+            <button
+              onClick={handlePrint}
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-md shadow-xs transition-colors"
             >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              <span>Back to Document</span>
-            </Link>
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-            Legal Professional Consultation Memorandum
-          </h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Attorney-ready structured summary to optimize billable consultation time.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3">
-          {documents.length > 1 && (
-            <select
-              value={selectedDocId}
-              onChange={(e) => setSelectedDocId(e.target.value)}
-              className="text-xs p-2 border border-slate-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-slate-900"
-            >
-              {documents.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.title}
-                </option>
-              ))}
-            </select>
-          )}
-
-          <button
-            onClick={handlePrint}
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-md shadow-xs transition-colors"
-          >
-            <Printer className="w-3.5 h-3.5" />
-            <span>Print Memorandum</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Memorandum Paper Container */}
-      <article className="bg-white border border-slate-200 rounded-lg p-6 sm:p-10 space-y-8 shadow-xs print:border-none print:shadow-none print:p-0">
-        {/* Memo Header */}
-        <div className="border-b-2 border-slate-900 pb-6 space-y-4">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold tracking-widest uppercase text-slate-500">
-              Confidential Client Preparation Memo
-            </span>
-            <span className="text-xs text-slate-400 font-mono">
-              Date: {new Date().toLocaleDateString()}
-            </span>
-          </div>
-
-          <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 uppercase tracking-tight">
-            Consultation Brief: {activeDoc.title}
-          </h2>
-
-          <div className="grid grid-cols-2 gap-4 text-xs font-mono pt-2">
-            <div>
-              <span className="text-slate-500 uppercase block">Subject Document:</span>
-              <span className="font-semibold text-slate-900">{activeDoc.fileName}</span>
-            </div>
-            <div>
-              <span className="text-slate-500 uppercase block">Document Classification:</span>
-              <span className="font-semibold text-slate-900">{activeDoc.documentType}</span>
-            </div>
+              <Printer className="w-3.5 h-3.5" />
+              <span>Print Memorandum</span>
+            </button>
           </div>
         </div>
 
-        {/* Persistent Non-Lawyer Disclaimer Notice */}
-        <div className="p-3.5 rounded bg-slate-100/90 border border-slate-200 text-xs text-slate-700 flex items-start gap-2.5">
-          <ShieldAlert className="w-4 h-4 text-slate-600 shrink-0 mt-0.5" />
-          <p className="leading-relaxed">
-            <strong>Scope & Limitations:</strong> This brief was generated with AI assistance via NyayaLens solely to organize facts and formulate questions for discussion with licensed counsel. It does not contain legal opinions or conclusions and does not substitute for attorney review.
-          </p>
-        </div>
-
-        {/* 1. Document Purpose & Operational Context */}
-        <section className="space-y-2">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-slate-100 pb-1">
-            1. Document Purpose & Overview
-          </h3>
-          <p className="text-xs sm:text-sm text-slate-800 leading-relaxed">
-            {brief.documentPurpose || activeDoc.plainLanguageSummary}
-          </p>
-        </section>
-
-        {/* 2. Contracting Parties & Governing Law */}
-        <section className="space-y-2">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-slate-100 pb-1">
-            2. Parties & Identified Jurisdiction
-          </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-            <div className="p-3 bg-slate-50 rounded border border-slate-200 space-y-1">
-              <span className="font-semibold text-slate-700 block">Identified Parties:</span>
-              {brief.parties.map((p, idx) => (
-                <div key={idx} className="text-slate-900">
-                  • <strong>{p.name}</strong> ({p.role})
-                </div>
-              ))}
+        {/* Memorandum Paper Container */}
+        <article className="bg-white border border-slate-200 rounded-lg p-6 sm:p-10 space-y-8 shadow-xs print:border-none print:shadow-none print:p-0">
+          {/* Memo Header */}
+          <div className="border-b-2 border-slate-900 pb-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold tracking-widest uppercase text-slate-500">
+                Confidential Client Preparation Memo
+              </span>
+              <span className="text-xs text-slate-400 font-mono">
+                Date: {new Date().toLocaleDateString()}
+              </span>
             </div>
 
-            <div className="p-3 bg-slate-50 rounded border border-slate-200 space-y-1">
-              <span className="font-semibold text-slate-700 block">Governing Law & Forum:</span>
-              <p className="text-slate-900 font-medium">
-                {brief.governingLawAndJurisdiction || 'Not explicitly identified in text'}
-              </p>
-            </div>
-          </div>
-        </section>
+            <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 uppercase tracking-tight">
+              Consultation Brief: {activeDoc.title}
+            </h2>
 
-        {/* 3. Key Business & Operational Terms */}
-        <section className="space-y-2">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-slate-100 pb-1">
-            3. Key Business Commitments
-          </h3>
-          <ul className="list-disc list-inside space-y-1 text-xs sm:text-sm text-slate-800">
-            {brief.keyBusinessTerms?.map((term, i) => (
-              <li key={i} className="leading-relaxed">{term}</li>
-            ))}
-            {activeDoc.obligations.slice(0, 3).map((ob, i) => (
-              <li key={`ob-${i}`}>
-                <strong>{ob.party}:</strong> {ob.description} {ob.deadline ? `(${ob.deadline})` : ''}
-              </li>
-            ))}
-          </ul>
-        </section>
-
-        {/* 4. Flagged Review Priorities (No Legal Conclusions) */}
-        <section className="space-y-2">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-slate-100 pb-1">
-            4. Flagged Items for Counsel Examination
-          </h3>
-          <p className="text-xs text-slate-500 italic mb-2">
-            The following provisions represent AI-identified flags where standard terms appear modified, asymmetric, or potentially restrictive:
-          </p>
-          <div className="space-y-2">
-            {activeDoc.risks.map((risk, i) => (
-              <div key={i} className="p-3 bg-slate-50/70 border border-slate-200 rounded text-xs space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-slate-900">{risk.title}</span>
-                  <span className="text-[10px] uppercase font-mono text-slate-500">
-                    Category: {risk.category}
-                  </span>
-                </div>
-                <p className="text-slate-700 leading-relaxed">{risk.explanation}</p>
-                {risk.quote && (
-                  <blockquote className="text-slate-600 italic border-l-2 border-slate-400 pl-2 text-[11px] my-1">
-                    "{risk.quote}"
-                  </blockquote>
-                )}
+            <div className="grid grid-cols-2 gap-4 text-xs font-mono pt-2">
+              <div>
+                <span className="text-slate-500 uppercase block">Subject Document:</span>
+                <span className="font-semibold text-slate-900">{activeDoc.fileName}</span>
               </div>
-            ))}
-          </div>
-        </section>
-
-        {/* 5. Specific Targeted Questions for Legal Counsel */}
-        <section className="space-y-3">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-slate-100 pb-1">
-            5. Recommended Consultation Agenda & Questions
-          </h3>
-          <div className="space-y-2">
-            {brief.questionsForCounsel?.map((q, idx) => (
-              <div key={idx} className="p-3 border border-slate-200 rounded bg-white text-xs space-y-1">
-                <div className="flex items-baseline gap-2">
-                  <span className="font-bold text-slate-900">Q{idx + 1}:</span>
-                  <span className="font-semibold text-slate-900">"{q.question}"</span>
-                </div>
-                {q.rationale && (
-                  <p className="text-slate-500 text-[11px] pl-6">
-                    <strong>Client Rationale:</strong> {q.rationale}
-                  </p>
-                )}
+              <div>
+                <span className="text-slate-500 uppercase block">Document Classification:</span>
+                <span className="font-semibold text-slate-900">{activeDoc.documentType}</span>
               </div>
-            ))}
+            </div>
           </div>
-        </section>
 
-        {/* 6. Relevant Document Sections to Review */}
-        {brief.relevantSectionsToHighlight && brief.relevantSectionsToHighlight.length > 0 && (
+          {/* Persistent Non-Lawyer Disclaimer Notice */}
+          <div className="p-3.5 rounded bg-slate-100/90 border border-slate-200 text-xs text-slate-700 flex items-start gap-2.5">
+            <ShieldAlert className="w-4 h-4 text-slate-600 shrink-0 mt-0.5" />
+            <p className="leading-relaxed">
+              <strong>Scope & Limitations:</strong> This brief was generated with AI assistance via NyayaLens solely to organize facts and formulate questions for discussion with licensed counsel. It does not contain legal opinions or conclusions and does not substitute for attorney review.
+            </p>
+          </div>
+
+          {/* 1. Document Purpose & Operational Context */}
           <section className="space-y-2">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-slate-100 pb-1">
-              6. Relevant Contract Sections for Direct Attorney Review
+              1. Document Purpose & Overview
             </h3>
-            <div className="flex flex-wrap gap-2 text-xs font-mono">
-              {brief.relevantSectionsToHighlight.map((sec, i) => (
-                <span key={i} className="bg-slate-100 border border-slate-200 px-2.5 py-1 rounded text-slate-800">
-                  {sec}
-                </span>
+            <p className="text-xs sm:text-sm text-slate-800 leading-relaxed font-sans">
+              {brief.documentPurpose || activeDoc.plainLanguageSummary}
+            </p>
+          </section>
+
+          {/* 2. Contracting Parties & Governing Law */}
+          <section className="space-y-2">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-slate-100 pb-1">
+              2. Parties & Identified Jurisdiction
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+              <div className="p-3 bg-slate-50 rounded border border-slate-200 space-y-1">
+                <span className="font-semibold text-slate-700 block">Identified Parties:</span>
+                {brief.parties.map((p, idx) => (
+                  <div key={idx} className="text-slate-900">
+                    • <strong>{p.name}</strong> ({p.role})
+                  </div>
+                ))}
+              </div>
+
+              <div className="p-3 bg-slate-50 rounded border border-slate-200 space-y-1">
+                <span className="font-semibold text-slate-700 block">Governing Law & Forum:</span>
+                <p className="text-slate-900 font-medium">
+                  {brief.governingLawAndJurisdiction || 'Not explicitly identified in text'}
+                </p>
+              </div>
+            </div>
+          </section>
+
+          {/* 3. Key Business & Operational Terms */}
+          <section className="space-y-2">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-slate-100 pb-1">
+              3. Key Business Commitments
+            </h3>
+            <ul className="list-disc list-inside space-y-1 text-xs sm:text-sm text-slate-800 font-sans">
+              {brief.keyBusinessTerms?.map((term, i) => (
+                <li key={i} className="leading-relaxed">{term}</li>
+              ))}
+              {activeDoc.obligations.slice(0, 3).map((ob, i) => (
+                <li key={`ob-${i}`}>
+                  <strong>{ob.party}:</strong> {ob.description} {ob.deadline ? `(${ob.deadline})` : ''}
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          {/* 4. Flagged Review Priorities (No Legal Conclusions) */}
+          <section className="space-y-2">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-slate-100 pb-1">
+              4. Flagged Items for Counsel Examination
+            </h3>
+            <p className="text-xs text-slate-500 italic mb-2">
+              The following provisions represent AI-identified flags where standard terms appear modified, asymmetric, or potentially restrictive:
+            </p>
+            <div className="space-y-2.5">
+              {activeDoc.risks.map((risk, i) => (
+                <div key={i} className="p-3 bg-slate-50/70 border border-slate-200 rounded text-xs space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-900">{risk.title}</span>
+                    <span className="text-[10px] uppercase font-mono text-slate-500 font-semibold">
+                      Category: {risk.category}
+                    </span>
+                  </div>
+                  <p className="text-slate-700 leading-relaxed font-sans">{risk.explanation}</p>
+                  {risk.quote && (
+                    <blockquote className="text-slate-700 italic border-l-2 border-amber-500 pl-2 text-[11px] my-1 font-serif">
+                      "{risk.quote}"
+                    </blockquote>
+                  )}
+                </div>
               ))}
             </div>
           </section>
-        )}
-      </article>
-    </div>
+
+          {/* 5. Specific Targeted Questions for Legal Counsel */}
+          <section className="space-y-3">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-slate-100 pb-1">
+              5. Recommended Consultation Agenda & Questions
+            </h3>
+            <div className="space-y-2">
+              {brief.questionsForCounsel?.map((q, idx) => (
+                <div key={idx} className="p-3 border border-slate-200 rounded bg-white text-xs space-y-1">
+                  <div className="flex items-baseline gap-2">
+                    <span className="font-bold text-amber-700">Q{idx + 1}:</span>
+                    <span className="font-semibold text-slate-900">"{q.question}"</span>
+                  </div>
+                  {q.rationale && (
+                    <p className="text-slate-500 text-[11px] pl-6 font-sans">
+                      <strong>Client Rationale:</strong> {q.rationale}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* 6. Relevant Document Sections to Review */}
+          {brief.relevantSectionsToHighlight && brief.relevantSectionsToHighlight.length > 0 && (
+            <section className="space-y-2">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-slate-100 pb-1">
+                6. Relevant Contract Sections for Direct Attorney Review
+              </h3>
+              <div className="flex flex-wrap gap-2 text-xs font-mono">
+                {brief.relevantSectionsToHighlight.map((sec, i) => (
+                  <span key={i} className="bg-slate-100 border border-slate-200 px-2.5 py-1 rounded text-slate-800">
+                    {sec}
+                  </span>
+                ))}
+              </div>
+            </section>
+          )}
+        </article>
+      </div>
+    </AppShell>
   );
 }
 
