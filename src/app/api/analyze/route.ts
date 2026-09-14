@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { extractTextFromBuffer, validateFileMetadata } from '@/lib/document-parser';
+import { ingestDocument, ingestRawText, IngestionError, IngestionResult } from '@/lib/ingestion';
 import { analyzeLegalDocument } from '@/lib/grounded-ai-engine';
-import { redactPersonalIdentifiableInformation } from '@/lib/sanitizer';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -9,75 +8,94 @@ export const dynamic = 'force-dynamic';
 export async function POST(req: NextRequest) {
   try {
     const contentType = req.headers.get('content-type') || '';
-
-    let textContent = '';
-    let fileName = 'Uploaded_Document.txt';
-    let fileType: 'pdf' | 'docx' | 'txt' | 'md' = 'txt';
-    let fileSize = 0;
-    let enablePiiPreRedaction = false;
+    let ingestionResult: IngestionResult;
 
     if (contentType.includes('multipart/form-data')) {
       const formData = await req.formData();
       const file = formData.get('file') as File | null;
       const piiFlag = formData.get('enablePiiPreRedaction');
-      enablePiiPreRedaction = piiFlag === 'true';
+      const enablePiiPreRedaction = piiFlag === 'true';
 
       if (!file) {
-        return NextResponse.json({ error: 'No file was provided in the upload request.' }, { status: 400 });
+        return NextResponse.json(
+          { success: false, error: 'No file was provided in the upload request.', errorCode: 'MALFORMED_REQUEST' },
+          { status: 400 }
+        );
       }
 
-      fileName = file.name;
-      fileSize = file.size;
-
-      const validation = validateFileMetadata(fileName, fileSize);
-      if (!validation.valid) {
-        return NextResponse.json({ error: validation.error }, { status: 400 });
-      }
+      const fileName = file.name;
+      const fileSize = file.size;
 
       const arrayBuffer = await file.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
 
-      const parsed = await extractTextFromBuffer(buffer, fileName, fileSize);
-      textContent = parsed.text;
-      fileType = parsed.fileType;
+      ingestionResult = await ingestDocument({
+        buffer,
+        fileName,
+        fileSize,
+        enablePiiPreRedaction,
+      });
     } else {
-      // JSON payload (e.g. pasted text or test mock)
+      // JSON payload (e.g. pasted text or direct test mock)
       const body = await req.json();
       if (!body.rawText || typeof body.rawText !== 'string' || body.rawText.trim().length === 0) {
-        return NextResponse.json({ error: 'Document text cannot be empty.' }, { status: 400 });
+        return NextResponse.json(
+          { success: false, error: 'Document text cannot be empty.', errorCode: 'EMPTY_FILE' },
+          { status: 400 }
+        );
       }
 
-      textContent = body.rawText.trim();
-      fileName = body.fileName || 'Pasted_Document.txt';
-      fileType = (body.fileType as 'pdf' | 'docx' | 'txt' | 'md') || 'txt';
-      fileSize = Buffer.byteLength(textContent, 'utf8');
-      enablePiiPreRedaction = !!body.enablePiiPreRedaction;
-    }
-
-    if (!textContent || textContent.length < 20) {
-      return NextResponse.json(
-        { error: 'The document does not contain sufficient text for legal analysis. Please verify the file content.' },
-        { status: 400 }
-      );
-    }
-
-    // Optional PII pre-redaction
-    let finalDocText = textContent;
-    if (enablePiiPreRedaction) {
-      const piiResult = redactPersonalIdentifiableInformation(textContent);
-      finalDocText = piiResult.redactedText;
+      ingestionResult = ingestRawText({
+        rawText: body.rawText,
+        fileName: body.fileName || 'Pasted_Document.txt',
+        fileType: body.fileType || 'txt',
+        enablePiiPreRedaction: !!body.enablePiiPreRedaction,
+      });
     }
 
     // Analyze document through grounded AI engine
-    const analysisResult = await analyzeLegalDocument(finalDocText, fileName, fileType, fileSize);
+    const analysisResult = await analyzeLegalDocument(
+      ingestionResult.normalizedText,
+      ingestionResult.fileName,
+      ingestionResult.format,
+      ingestionResult.fileSize
+    );
 
     return NextResponse.json({
       success: true,
       document: analysisResult,
+      ingestion: {
+        id: ingestionResult.id,
+        sections: ingestionResult.sections,
+        metadata: ingestionResult.metadata,
+        chunks: ingestionResult.chunks,
+        security: {
+          hasPromptInjectionAttempt: ingestionResult.security.hasPromptInjectionAttempt,
+          detectedInjectionPatterns: ingestionResult.security.detectedInjectionPatterns,
+          piiRedacted: ingestionResult.security.piiRedacted,
+          redactionCount: ingestionResult.security.redactionCount,
+        },
+      },
     });
   } catch (error: unknown) {
+    if (error instanceof IngestionError) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: error.message,
+          errorCode: error.code,
+        },
+        { status: error.httpStatus }
+      );
+    }
+
+    // Safe error message to avoid exposing system details, stack traces, or secrets
     console.error('Document analysis route failure:', error);
     const message = error instanceof Error ? error.message : 'An error occurred during document processing.';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: message, errorCode: 'EXTRACTION_FAILED' },
+      { status: 500 }
+    );
   }
 }
+
