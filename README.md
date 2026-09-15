@@ -2,11 +2,23 @@
 
 > **"Understand your legal documents. Know what matters. Take the next safe step."**
 
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-nyayalens--eight.vercel.app-000000?style=for-the-badge&logo=vercel)](https://nyayalens-eight.vercel.app)
+[![GitHub](https://img.shields.io/badge/GitHub-Manas51240%2FNyayaLens-181717?style=for-the-badge&logo=github)](https://github.com/Manas51240/NyayaLens)
 [![Next.js](https://img.shields.io/badge/Next.js-15.5.25-black?style=flat&logo=next.js)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue?style=flat&logo=typescript)](https://www.typescriptlang.org/)
 [![Tailwind CSS](https://img.shields.io/badge/TailwindCSS-3.4-38bdf8?style=flat&logo=tailwind-css)](https://tailwindcss.com/)
 [![Tests](https://img.shields.io/badge/Vitest-108%20Passed-emerald)](https://vitest.dev/)
 [![WCAG](https://img.shields.io/badge/Accessibility-WCAG%202.1%20AA-success)](#accessibility)
+
+---
+
+### 🌐 Quick Links
+
+- **🚀 Live Production App**: [https://nyayalens-eight.vercel.app](https://nyayalens-eight.vercel.app)
+- **📂 Public GitHub Repository**: [https://github.com/Manas51240/NyayaLens](https://github.com/Manas51240/NyayaLens)
+- **⚡ Vercel Deployment Dashboard**: [https://vercel.com/manas51240s-projects/nyayalens](https://vercel.com/manas51240s-projects/nyayalens)
+
+---
 
 **NyayaLens** is a production-grade GenAI-powered legal document understanding and risk evaluation platform built for the **AI for Legal Assistance & Access** challenge vertical. It empowers individuals, employees, and small business owners to comprehend complex contracts, identify AI-identified review priorities, compare draft iterations, and arrive at consultations with qualified legal counsel prepared with exact citations and targeted questions.
 
