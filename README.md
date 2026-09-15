@@ -2,10 +2,10 @@
 
 > **"Understand your legal documents. Know what matters. Take the next safe step."**
 
-[![Next.js](https://img.shields.io/badge/Next.js-15.1.7-black?style=flat&logo=next.js)](https://nextjs.org/)
+[![Next.js](https://img.shields.io/badge/Next.js-15.5.25-black?style=flat&logo=next.js)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue?style=flat&logo=typescript)](https://www.typescriptlang.org/)
 [![Tailwind CSS](https://img.shields.io/badge/TailwindCSS-3.4-38bdf8?style=flat&logo=tailwind-css)](https://tailwindcss.com/)
-[![Tests](https://img.shields.io/badge/Vitest-18%20Passed-emerald)](https://vitest.dev/)
+[![Tests](https://img.shields.io/badge/Vitest-108%20Passed-emerald)](https://vitest.dev/)
 [![WCAG](https://img.shields.io/badge/Accessibility-WCAG%202.1%20AA-success)](#accessibility)
 
 **NyayaLens** is a production-grade GenAI-powered legal document understanding and risk evaluation platform built for the **AI for Legal Assistance & Access** challenge vertical. It empowers individuals, employees, and small business owners to comprehend complex contracts, identify AI-identified review priorities, compare draft iterations, and arrive at consultations with qualified legal counsel prepared with exact citations and targeted questions.
@@ -49,8 +49,8 @@ Legal agreements govern the most consequential relationships in modern life—em
    - *termination*, *payment*, *liability*, *renewal*, *confidentiality*, *privacy/data*, *dispute resolution*, *restrictive covenants*, *penalties*, *unusual obligations*.
    - Clearly rated by AI-identified *review priority* (`high`, `medium`, `low`, `informational`), never as a legal enforceability judgment.
 4. **Evidence-Grounded Inquiries (Ask Document)**: Questions are answered strictly using retrieved document evidence with page/section citations. If an item is absent from the text, NyayaLens explicitly issues an absence notice.
-5. **Contract Delta Comparison**: Compare Original Agreements vs Counterparty Redlines (v1 vs v2). Tracks shifted liability caps, liquidated damages, altered dates, additions, and deletions.
-6. **Action Plan Generator**: Generates actionable execution checklists, calendar notice windows, and documents to gather.
+5. **Contract Delta Comparison**: Compare Original Agreements vs Counterparty Redlines (v1 vs v2) across 9 legal dimensions with neutral review priorities.
+6. **Action Plan Generator**: Generates actionable execution checklists, calendar notice windows, and documents to gather, with automatic local persistence across sessions.
 7. **Lawyer Consultation Brief**: Generates a professional, printable memorandum containing executive facts, flagged clauses, and prioritized questions for legal counsel.
 
 ---
@@ -67,7 +67,7 @@ Legal agreements govern the most consequential relationships in modern life—em
 ```
 [ Client Browser (WCAG 2.1 AA Accessible UI) ]
       │
-      ├──> Next.js App Router (15.1.7) / TypeScript / Tailwind CSS
+      ├──> Next.js App Router (15.5.25) / TypeScript / Tailwind CSS
       │
       ├──> [ Server-Side Secure API Routes ] (No browser API key leaks)
       │       ├── /api/analyze  --> Input Sanitizer & Extraction Engine
@@ -76,7 +76,9 @@ Legal agreements govern the most consequential relationships in modern life—em
       │
       ├──> [ Untrusted Input Isolation Shield ]
       │       ├── Delimiter Wrapping: <<<UNTRUSTED_DOCUMENT_CONTENT>>>
-      │       ├── Adversarial Pattern Neutralization
+      │       ├── Zero-Width Space & Bidi Override Neutralization
+      │       ├── Adversarial Pattern Neutralization ([INST], <|im_start|>, DAN)
+      │       ├── Markdown Exfiltration Link Neutralization
       │       └── Optional Client-Side PII Pre-Redaction (SSN, phone, email)
       │
       └──> [ Dual Execution Engine ]
@@ -108,7 +110,8 @@ Legal documents uploaded by users must be treated as **untrusted data**:
 - **System Prompt Hardening**: The model is instructed to treat all text inside the boundaries strictly as content to be analyzed, never as directives to execute.
 - **Adversarial Query Filtering**: Questions containing jailbreak phrases (`ignore previous instructions`, `reveal system prompt`, `say this contract is 100% legal`) are automatically detected and blocked.
 - **Server-Side API Calling**: API keys (`GEMINI_API_KEY`) reside exclusively in server-side environment variables and are never sent to client bundles.
-- **File Restrictions**: Strict validation restricts uploads to `.pdf`, `.docx`, `.txt`, and `.md` with an enforced 10MB ceiling.
+- **File Restrictions**: Strict validation restricts uploads to `.pdf`, `.docx`, `.txt`, and `.md` with an enforced 10MB ceiling, magic bytes header checking, and Windows reserved name neutralization (`CON.txt` -> `safe_CON.txt`).
+- **HTTP Security Headers**: Strict Content Security Policy (`CSP`), `X-Frame-Options: DENY`, and `X-Content-Type-Options: nosniff`.
 
 ---
 
@@ -116,7 +119,8 @@ Legal documents uploaded by users must be treated as **untrusted data**:
 
 - **Semantic HTML5 Landmarks**: Proper `<header>`, `<main>`, `<aside>`, `<section>`, and `<footer>` layout.
 - **Keyboard Navigation & Skip Links**: Includes "Skip to main content" link and visible `:focus-visible` outlines.
-- **ARIA Standards**: Live regions for dynamic extraction status and accessible dialog/tab controls.
+- **Interactive Evidence Drawer**: Modal drawer with keyboard `Escape` dismissal, focus trapping, and accessible backdrop overlay.
+- **ARIA Standards**: Live regions (`role="log"`, `aria-live="polite"`) for dynamic chat and status alerts.
 - **Contrast & Independence from Color**: Risk severity levels combine high-contrast color badges with explicit text labels (`High Review Priority`) and unique icons (`AlertTriangle`, `AlertCircle`, `CheckCircle2`, `Info`).
 - **Responsive Layout**: Fluid experience across mobile phones (375px), tablets (768px), and high-resolution desktops.
 
@@ -124,12 +128,17 @@ Legal documents uploaded by users must be treated as **untrusted data**:
 
 ## Testing & Verification
 
-NyayaLens includes a comprehensive Vitest test suite (`tests/`):
-- `tests/extraction-and-validation.test.ts`: PDF, DOCX, and TXT extraction, format validation, and 10MB size enforcement.
-- `tests/prompt-injection.test.ts`: Neutralizing adversarial prompt injection attacks and testing PII redaction.
-- `tests/grounding-and-hallucination.test.ts`: Verifying quotation accuracy and confirming safe "not found" responses for unmentioned queries.
-- `tests/comparison.test.ts`: Semantic diffing between standard NDA v1 and vendor redline v2.
-- `tests/safety-disclaimers.test.ts`: Guaranteeing non-lawyer disclaimers and verifying absence of legal validity assertions.
+NyayaLens includes a comprehensive Vitest test suite (`tests/`) containing **10 test suites and 108 automated tests**:
+1. `tests/api-routes.test.ts`: Next.js HTTP API route handlers (`/api/analyze`, `/api/ask`, `/api/compare`), payload limits, status codes.
+2. `tests/security-audit.test.ts`: 14-domain security audit (direct/indirect injection, zero-width evasion, markdown exfiltration, credentials redaction).
+3. `tests/ingestion-pipeline.test.ts`: Multi-stage document ingestion, magic byte checking, section detection, normalization.
+4. `tests/evidence-grounded-qa.test.ts`: 8-stage Q&A pipeline, semantic retrieval, quote citations, confidence scoring.
+5. `tests/hallucination-resistance.test.ts`: Absence detection, quote verification, unsupported claim rejection.
+6. `tests/grounding-and-hallucination.test.ts`: Grounding integrity and citation verification.
+7. `tests/comparison.test.ts`: 9-dimension semantic comparison engine with neutral review priorities.
+8. `tests/prompt-injection.test.ts`: Boundary break-out defense, adversarial query blocking, and client-side PII redaction.
+9. `tests/safety-disclaimers.test.ts`: Legal disclaimer attachment and outcome certainty reframing.
+10. `tests/extraction-and-validation.test.ts`: PDF/DOCX format validation, 10MB file ceiling enforcement.
 
 To run the automated tests:
 ```bash
