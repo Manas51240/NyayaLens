@@ -7,8 +7,9 @@
 
 // Patterns matching potential sensitive credentials and internal system details
 const SENSITIVE_PATTERNS = [
-  // Google / Gemini API Keys (AIza...)
+  // Google / Gemini API Keys (legacy AIza... and modern AQ....)
   /\bAIza[0-9A-Za-z-_]{30,45}\b/g,
+  /\bAQ\.[0-9A-Za-z-_]{35,65}\b/g,
   // Generic Bearer tokens
   /\bBearer\s+[A-Za-z0-9\-._~+/]+=*/gi,
   // Generic API keys and secret tokens
