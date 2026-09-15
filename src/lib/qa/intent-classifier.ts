@@ -13,6 +13,59 @@ const LEGAL_STOP_WORDS = new Set([
   'is', 'was', 'were', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'of', 'by', 'as', 'an', 'be', 'so', 'if'
 ]);
 
+// Deterministic natural-language phrase mapping to core legal constructs
+export const NATURAL_LANGUAGE_LEGAL_MAPPINGS: Array<{
+  pattern: RegExp;
+  expansion: string[];
+  intentHint?: QueryIntent;
+}> = [
+  {
+    pattern: /\bleave\s+early\b/i,
+    expansion: ['termination', 'terminate', 'cancellation', 'early termination', 'notice'],
+    intentHint: 'SPECIFIC_CLAUSE_QUERY',
+  },
+  {
+    pattern: /\b(?:don'?t|do\s+not)\s+comply\b/i,
+    expansion: ['breach', 'default', 'cure', 'remedy', 'termination'],
+    intentHint: 'RISK_LIABILITY_QUERY',
+  },
+  {
+    pattern: /\bget\s+out\s+of\s+(?:the\s+)?contract\b/i,
+    expansion: ['termination', 'cancellation', 'notice', 'expiration'],
+    intentHint: 'SPECIFIC_CLAUSE_QUERY',
+  },
+  {
+    pattern: /\bwhat\s+happens\s+if\s+i\s+break\s+(?:it|the\s+contract)\b/i,
+    expansion: ['breach', 'default', 'remedies', 'cure', 'termination'],
+    intentHint: 'RISK_LIABILITY_QUERY',
+  },
+  {
+    pattern: /\bhow\s+much\s+do\s+i\s+have\s+to\s+pay\b/i,
+    expansion: ['payment', 'fee', 'compensation', 'rent', 'invoice', 'penalty'],
+    intentHint: 'FINANCIAL_TERMS_QUERY',
+  },
+  {
+    pattern: /\bquit\s+(?:my\s+)?job\b/i,
+    expansion: ['termination', 'resignation', 'notice', 'severance'],
+    intentHint: 'PARTY_OBLIGATION_QUERY',
+  },
+  {
+    pattern: /\bwork\s+for\s+(?:a\s+)?competitor\b/i,
+    expansion: ['non-solicitation', 'non-compete', 'restrictive covenant', 'confidentiality'],
+    intentHint: 'SPECIFIC_CLAUSE_QUERY',
+  },
+  {
+    pattern: /\bkick\s+me\s+out\b/i,
+    expansion: ['termination', 'default', 'eviction', 'notice'],
+    intentHint: 'SPECIFIC_CLAUSE_QUERY',
+  },
+  {
+    pattern: /\blate\s+fee\b/i,
+    expansion: ['penalty', 'interest', 'liquidated damages', 'default'],
+    intentHint: 'FINANCIAL_TERMS_QUERY',
+  },
+];
+
 /**
  * Classifies query intent and extracts target topics for evidence retrieval.
  */
@@ -55,6 +108,21 @@ export function classifyQueryIntent(question: string): IntentClassificationResul
     .filter((w) => w.length > 2 && !LEGAL_STOP_WORDS.has(w));
 
   const primaryTopics = Array.from(new Set(words));
+
+  // Apply deterministic natural language legal phrase expansion
+  let phraseIntentHint: QueryIntent | undefined;
+  for (const mapping of NATURAL_LANGUAGE_LEGAL_MAPPINGS) {
+    if (mapping.pattern.test(qLower)) {
+      if (!phraseIntentHint && mapping.intentHint) {
+        phraseIntentHint = mapping.intentHint;
+      }
+      for (const term of mapping.expansion) {
+        if (!primaryTopics.includes(term)) {
+          primaryTopics.push(term);
+        }
+      }
+    }
+  }
 
   // Entity extraction heuristic (parties or specific legal roles)
   const extractedEntities: string[] = [];

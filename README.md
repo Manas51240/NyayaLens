@@ -8,7 +8,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue?style=flat&logo=typescript)](https://www.typescriptlang.org/)
 [![Tailwind CSS](https://img.shields.io/badge/TailwindCSS-3.4-38bdf8?style=flat&logo=tailwind-css)](https://tailwindcss.com/)
 [![Tests](https://img.shields.io/badge/Vitest-121%20Passed%20(11%20Suites)-emerald)](https://vitest.dev/)
-[![WCAG](https://img.shields.io/badge/Accessibility-WCAG%202.1%20AA-success)](#accessibility)
+[![Accessibility](https://img.shields.io/badge/Accessibility-WCAG%202.1%20AA%20Oriented-success)](#accessibility)
 
 ---
 
@@ -32,7 +32,7 @@
 4. [System Architecture](#system-architecture)
 5. [AI Approach & Grounding](#ai-approach--grounding)
 6. [Security & Prompt Injection Defenses](#security--prompt-injection-defenses)
-7. [Accessibility (WCAG 2.1 AA)](#accessibility)
+7. [Accessibility (WCAG 2.1 AA–Oriented Implementation)](#accessibility)
 8. [Testing & Verification](#testing--verification)
 9. [Assumptions & Limitations](#assumptions--limitations)
 10. [Deployment Instructions](#deployment-instructions)
@@ -78,7 +78,7 @@ Legal agreements govern the most consequential relationships in modern life—em
 ## System Architecture
 
 ```
-[ Client Browser (WCAG 2.1 AA Accessible UI) ]
+[ Client Browser (WCAG 2.1 AA–Oriented Accessible UI) ]
       │
       ├──> Next.js App Router (15.5.25) / TypeScript / Tailwind CSS
       │
@@ -96,7 +96,7 @@ Legal agreements govern the most consequential relationships in modern life—em
       │
       └──> [ Dual Execution Engine ]
               ├── 1. Google Gemini 2.5 Flash (via secure server env vars)
-              └── 2. Offline Deterministic Legal Extraction Fallback (100% testable offline)
+              └── 2. Offline Deterministic Legal Extraction Fallback (Fully testable offline)
 ```
 
 ---
@@ -128,7 +128,9 @@ Legal documents uploaded by users must be treated as **untrusted data**:
 
 ---
 
-## Accessibility (WCAG 2.1 AA)
+## Accessibility (WCAG 2.1 AA–Oriented Implementation)
+
+NyayaLens features a WCAG 2.1 AA–oriented accessibility implementation designed to maximize usability for assistive tech users and keyboard navigators:
 
 - **Semantic HTML5 Landmarks**: Proper `<header>`, `<main>`, `<aside>`, `<section>`, and `<footer>` layout.
 - **Keyboard Navigation & Skip Links**: Includes "Skip to main content" link and visible `:focus-visible` outlines.
@@ -141,17 +143,18 @@ Legal documents uploaded by users must be treated as **untrusted data**:
 
 ## Testing & Verification
 
-NyayaLens includes a comprehensive Vitest test suite (`tests/`) containing **10 test suites and 108 automated tests**:
-1. `tests/api-routes.test.ts`: Next.js HTTP API route handlers (`/api/analyze`, `/api/ask`, `/api/compare`), payload limits, status codes.
-2. `tests/security-audit.test.ts`: 14-domain security audit (direct/indirect injection, zero-width evasion, markdown exfiltration, credentials redaction).
-3. `tests/ingestion-pipeline.test.ts`: Multi-stage document ingestion, magic byte checking, section detection, normalization.
-4. `tests/evidence-grounded-qa.test.ts`: 8-stage Q&A pipeline, semantic retrieval, quote citations, confidence scoring.
-5. `tests/hallucination-resistance.test.ts`: Absence detection, quote verification, unsupported claim rejection.
-6. `tests/grounding-and-hallucination.test.ts`: Grounding integrity and citation verification.
-7. `tests/comparison.test.ts`: 9-dimension semantic comparison engine with neutral review priorities.
-8. `tests/prompt-injection.test.ts`: Boundary break-out defense, adversarial query blocking, and client-side PII redaction.
-9. `tests/safety-disclaimers.test.ts`: Legal disclaimer attachment and outcome certainty reframing.
-10. `tests/extraction-and-validation.test.ts`: PDF/DOCX format validation, 10MB file ceiling enforcement.
+NyayaLens includes a comprehensive Vitest test suite (`tests/`) containing **121 automated tests across 11 test suites**:
+1. `tests/modality-preservation.test.ts`: Contractual modality preservation guardian (shall, must, may, can, will, unless, subject to).
+2. `tests/evidence-grounded-qa.test.ts`: 8-stage Q&A pipeline, semantic retrieval, strict structured output schema validation, natural language query expansion.
+3. `tests/prompt-injection.test.ts`: Boundary break-out defense, adversarial query blocking, and client-side PII redaction.
+4. `tests/grounding-and-hallucination.test.ts`: Grounding integrity, quote fidelity, and citation verification.
+5. `tests/comparison.test.ts`: 9-dimension semantic comparison engine with neutral review priorities.
+6. `tests/safety-disclaimers.test.ts`: Legal disclaimer attachment and outcome certainty reframing.
+7. `tests/hallucination-resistance.test.ts`: Absence detection, quote verification, unsupported claim rejection.
+8. `tests/extraction-and-validation.test.ts`: PDF/DOCX format validation, 10MB file ceiling enforcement.
+9. `tests/ingestion-pipeline.test.ts`: Multi-stage document ingestion, magic byte checking, section detection, normalization.
+10. `tests/security-audit.test.ts`: 14-domain security audit (direct/indirect injection, zero-width evasion, markdown exfiltration, credentials redaction).
+11. `tests/api-routes.test.ts`: Next.js HTTP API route handlers (`/api/analyze`, `/api/ask`, `/api/compare`), payload limits, status codes.
 
 To run the automated tests:
 ```bash
@@ -173,8 +176,8 @@ NyayaLens is architected for instant deployment on **Vercel**:
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/your-org/nyayalens.git
-   cd nyayalens
+   git clone https://github.com/Manas51240/NyayaLens.git
+   cd NyayaLens
    ```
 2. Install dependencies:
    ```bash

@@ -6,26 +6,29 @@ import { wrapUntrustedDocumentText } from '../sanitizer';
 import { safeLogError } from '../security/error-sanitizer';
 
 /**
- * Strict Structured Output Schema for Grounded Q&A Synthesis
+ * Strict Structured Output Schema for Grounded Q&A Synthesis.
+ * Enforces z.object({...}).strict() so unknown or extra properties are firmly rejected.
  */
-export const GroundedQASynthesisSchema = z.object({
-  answer: z.string().min(5, 'Answer must contain meaningful content'),
-  answerType: z.enum(['direct_answer', 'not_found', 'ambiguous', 'legal_advice_boundary']),
-  evidence: z
-    .array(
-      z.object({
-        section: z.string().default('Document Provision'),
-        quote: z.string().default(''),
-        relevance: z.string().default(''),
-      })
-    )
-    .default([]),
-  notFound: z.boolean().default(false),
-  limitations: z.string().optional(),
-  confidence: z.number().min(0).max(100).default(80),
-  safetyNote: z.string().optional(),
-  suggestedFollowUpQuestions: z.array(z.string()).default([]),
-});
+export const GroundedQAEvidenceItemSchema = z
+  .object({
+    section: z.string().default('Document Provision'),
+    quote: z.string().default(''),
+    relevance: z.string().default(''),
+  })
+  .strict();
+
+export const GroundedQASynthesisSchema = z
+  .object({
+    answer: z.string().min(5, 'Answer must contain meaningful content'),
+    answerType: z.enum(['direct_answer', 'not_found', 'ambiguous', 'legal_advice_boundary']),
+    evidence: z.array(GroundedQAEvidenceItemSchema).default([]),
+    notFound: z.boolean().default(false),
+    limitations: z.string().optional(),
+    confidence: z.number().min(0).max(100).default(80),
+    safetyNote: z.string().optional(),
+    suggestedFollowUpQuestions: z.array(z.string()).default([]),
+  })
+  .strict();
 
 export type GroundedQASynthesis = z.infer<typeof GroundedQASynthesisSchema>;
 
@@ -158,14 +161,61 @@ Respond with a single structured JSON object conforming to this schema:
       }
     }
 
-    // Calibrate confidence: if quotes were ungrounded or absent, penalize confidence
-    let finalConfidence = rawResult.confidence;
-    if (rawResult.notFound) {
+    // DETERMINISTIC EVIDENCE-FIRST CONFIDENCE SCORING:
+    // Do NOT blindly trust the confidence number returned by Gemini.
+    // Final confidence primarily reflects deterministic verification:
+    // evidence availability, retrieval relevance, quote grounding fidelity, and modality preservation.
+    let finalConfidence = 0;
+
+    if (rawResult.notFound || rawResult.answerType === 'not_found' || verifiedEvidence.length === 0) {
+      // For not-found answers or zero verified evidence, confidence MUST strictly remain 0.
       finalConfidence = 0;
-    } else if (ungroundedCount > 0) {
-      finalConfidence = Math.max(10, Math.round(finalConfidence * 0.5));
-    } else if (!modalityPreserved) {
-      finalConfidence = Math.max(20, Math.round(finalConfidence * 0.8));
+    } else {
+      // 1. Evidence availability baseline
+      let deterministicScore = verifiedEvidence.length >= 2 ? 75 : 60;
+
+      // 2. Exact / normalized quote fidelity
+      const allVerbatim = verifiedEvidence.every((ev) => ev.isVerbatim);
+      const anyVerbatim = verifiedEvidence.some((ev) => ev.isVerbatim);
+      if (allVerbatim) {
+        deterministicScore += 15;
+      } else if (anyVerbatim) {
+        deterministicScore += 10;
+      } else {
+        deterministicScore += 5;
+      }
+
+      // 3. Retrieval relevance grounding
+      const topRetrievalScore = retrievalResult.evidenceItems[0]?.relevanceScore ?? 50;
+      if (topRetrievalScore >= 80) {
+        deterministicScore += 10;
+      } else if (topRetrievalScore < 50) {
+        deterministicScore -= 15;
+      }
+
+      // 4. Ungrounded quote penalty (model hallucinated quotes outside document)
+      if (ungroundedCount > 0) {
+        deterministicScore -= ungroundedCount * 25;
+      }
+
+      // 5. Modality preservation penalty
+      if (!modalityPreserved) {
+        deterministicScore -= 30;
+      }
+
+      // Clamp deterministic verification score between 0 and 100
+      deterministicScore = Math.max(0, Math.min(100, deterministicScore));
+
+      if (deterministicScore === 0) {
+        finalConfidence = 0;
+      } else {
+        // Gemini confidence is treated as a secondary input (15% weight) bounded strictly
+        // by the deterministic verification score as an authoritative ceiling.
+        const modelReported = Math.max(0, Math.min(100, rawResult.confidence ?? 50));
+        const blended = Math.round(deterministicScore * 0.85 + modelReported * 0.15);
+        finalConfidence = Math.min(blended, deterministicScore);
+        finalConfidence = Math.max(0, Math.min(100, finalConfidence));
+      }
     }
 
     return {

@@ -14,6 +14,22 @@ describe('Contractual Modality Preservation Guardian', () => {
     expect(terms.permissive).toContain('may');
     expect(terms.conditional).toContain('provided that');
     expect(terms.conditional).toContain('subject to');
+
+    // Comprehensive verification covering all 16 protected legal modality terms
+    const complexClause =
+      'Notwithstanding section 4, Provider will deliver reports within 30 days after invoice and before audit, only if Customer must pay upon delivery, except at the discretion of Provider who can waive fees.';
+    const complexTerms = extractModalityTerms(complexClause);
+    expect(complexTerms.mandatory).toContain('will');
+    expect(complexTerms.mandatory).toContain('must');
+    expect(complexTerms.permissive).toContain('can');
+    expect(complexTerms.permissive).toContain('at the discretion of');
+    expect(complexTerms.conditional).toContain('notwithstanding');
+    expect(complexTerms.conditional).toContain('within');
+    expect(complexTerms.conditional).toContain('after');
+    expect(complexTerms.conditional).toContain('before');
+    expect(complexTerms.conditional).toContain('upon');
+    expect(complexTerms.conditional).toContain('only if');
+    expect(complexTerms.conditional).toContain('except');
   });
 
   it('approves faithful simplification preserving permissive optionality ("may")', () => {

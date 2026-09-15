@@ -18,7 +18,7 @@ export interface ModalityIntegrityReport {
   generatedModalityProfile: string[];
 }
 
-const MANDATORY_TERMS = ['shall', 'must', 'is required to', 'are required to', 'covenants to', 'agrees to'];
+const MANDATORY_TERMS = ['shall', 'must', 'will', 'is required to', 'are required to', 'covenants to', 'agrees to'];
 const PERMISSIVE_TERMS = ['may', 'can', 'is permitted to', 'are permitted to', 'has the option to', 'at the discretion of', 'at its discretion'];
 const CONDITIONAL_TERMS = ['unless', 'except', 'provided that', 'subject to', 'notwithstanding', 'only if', 'within', 'after', 'before', 'upon'];
 
