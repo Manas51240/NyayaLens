@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { LegalRisk, RiskCategory, RiskSeverity } from '@/types/legal';
 import { RiskBadge } from '@/components/common/RiskBadge';
 import {
@@ -45,26 +45,31 @@ export const RiskRadarView: React.FC<RiskRadarViewProps> = ({ risks, documentTit
   const [copiedQuestionId, setCopiedQuestionId] = useState<string | null>(null);
   const [inspectRisk, setInspectRisk] = useState<LegalRisk | null>(null);
 
-  // Group risks by category
-  const categoryCounts = ALL_CATEGORIES.reduce<Record<string, number>>((acc, cat) => {
-    acc[cat] = risks.filter((r) => r.category.toLowerCase() === cat.toLowerCase()).length;
-    return acc;
-  }, {});
+  // Group risks by category (memoized for render efficiency)
+  const categoryCounts = useMemo(() => {
+    return ALL_CATEGORIES.reduce<Record<string, number>>((acc, cat) => {
+      acc[cat] = risks.filter((r) => r.category.toLowerCase() === cat.toLowerCase()).length;
+      return acc;
+    }, {});
+  }, [risks]);
 
-  // Severity counts
-  const severityCounts = {
+  // Severity counts (memoized for render efficiency)
+  const severityCounts = useMemo(() => ({
     high: risks.filter((r) => r.severity === 'high').length,
     medium: risks.filter((r) => r.severity === 'medium').length,
     low: risks.filter((r) => r.severity === 'low').length,
     informational: risks.filter((r) => r.severity === 'informational').length,
-  };
+  }), [risks]);
 
-  const filteredRisks = risks.filter((r) => {
-    const matchesCategory =
-      selectedCategory === 'all' || r.category.toLowerCase() === selectedCategory.toLowerCase();
-    const matchesSeverity = selectedSeverity === 'all' || r.severity === selectedSeverity;
-    return matchesCategory && matchesSeverity;
-  });
+  // Filtered risks (memoized for render efficiency)
+  const filteredRisks = useMemo(() => {
+    return risks.filter((r) => {
+      const matchesCategory =
+        selectedCategory === 'all' || r.category.toLowerCase() === selectedCategory.toLowerCase();
+      const matchesSeverity = selectedSeverity === 'all' || r.severity === selectedSeverity;
+      return matchesCategory && matchesSeverity;
+    });
+  }, [risks, selectedCategory, selectedSeverity]);
 
   const handleCopyQuestion = (id: string, question: string) => {
     navigator.clipboard.writeText(question);

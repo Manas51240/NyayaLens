@@ -236,7 +236,47 @@ Respond with a single structured JSON object conforming to this schema:
 }
 
 /**
- * Invokes Gemini 2.5 Flash API with single retry for JSON schema validation
+ * Deterministically normalizes and extracts JSON candidates from LLM responses,
+ * safely handling markdown code fences or conversational wrappers without triggering
+ * unnecessary and expensive correction retries.
+ */
+export function extractAndParseJsonCandidate(rawText: string): unknown | null {
+  const trimmed = rawText.trim();
+
+  // 1. Direct parse attempt
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    // Continue to normalization
+  }
+
+  // 2. Strip markdown code fences (```json ... ``` or ``` ... ```)
+  const fenceMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  if (fenceMatch) {
+    try {
+      return JSON.parse(fenceMatch[1].trim());
+    } catch {
+      // Continue
+    }
+  }
+
+  // 3. Extract JSON object substring between outermost curly braces
+  const firstBrace = trimmed.indexOf('{');
+  const lastBrace = trimmed.lastIndexOf('}');
+  if (firstBrace !== -1 && lastBrace > firstBrace) {
+    try {
+      return JSON.parse(trimmed.substring(firstBrace, lastBrace + 1));
+    } catch {
+      // Fall through
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Invokes Gemini 2.5 Flash API with server-side prompt caching and
+ * single correction retry only when schema validation genuinely fails.
  */
 async function callGeminiWithRetry(
   apiKey: string,
@@ -253,7 +293,10 @@ async function callGeminiWithRetry(
         'x-goog-api-key': apiKey,
       },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: `${systemInstruction}\n\n${promptText}` }] }],
+        systemInstruction: {
+          parts: [{ text: systemInstruction.trim() }],
+        },
+        contents: [{ parts: [{ text: promptText.trim() }] }],
         generationConfig: {
           temperature: 0.1,
           responseMimeType: 'application/json',
@@ -272,29 +315,25 @@ async function callGeminiWithRetry(
   // Attempt 1
   const firstResponse = await attemptCall(userPrompt);
   if (firstResponse) {
-    try {
-      const parsedJson = JSON.parse(firstResponse);
+    const parsedJson = extractAndParseJsonCandidate(firstResponse);
+    if (parsedJson) {
       const validation = GroundedQASynthesisSchema.safeParse(parsedJson);
       if (validation.success) {
         return validation.data;
       }
-    } catch {
-      // JSON parse error, will retry once
     }
   }
 
-  // Attempt 2: Correction Retry
-  const correctionPrompt = `${userPrompt}\n\nIMPORTANT CORRECTION: Your previous output failed JSON validation. Please return ONLY a valid JSON object matching the exact schema with all required fields (answer, answerType, evidence, notFound, confidence, suggestedFollowUpQuestions).`;
+  // Attempt 2: Correction Retry (Triggered ONLY when schema validation genuinely failed)
+  const correctionPrompt = `${userPrompt}\n\nIMPORTANT CORRECTION: Your previous output failed strict JSON schema validation. Return ONLY a valid JSON object matching the required schema without extra fields or conversational wrappers.`;
   const secondResponse = await attemptCall(correctionPrompt);
   if (secondResponse) {
-    try {
-      const parsedJson = JSON.parse(secondResponse);
+    const parsedJson = extractAndParseJsonCandidate(secondResponse);
+    if (parsedJson) {
       const validation = GroundedQASynthesisSchema.safeParse(parsedJson);
       if (validation.success) {
         return validation.data;
       }
-    } catch {
-      // Retry failed, fallback will trigger
     }
   }
 

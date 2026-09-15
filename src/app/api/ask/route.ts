@@ -3,11 +3,29 @@ import { askDocumentQuestion } from '@/lib/grounded-ai-engine';
 import { LegalDocument } from '@/types/legal';
 import { safeLogError, getSafeErrorMessage } from '@/lib/security/error-sanitizer';
 
+import { checkRateLimit } from '@/lib/security/rate-limiter';
+
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
   try {
+    // 1. Rate Limiting Check (60 req/min per client)
+    const rateLimit = checkRateLimit(req, { maxRequests: 60, windowMs: 60000 });
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please wait a moment before submitting another inquiry.' },
+        {
+          status: 429,
+          headers: {
+            'Retry-After': String(rateLimit.resetSeconds),
+            'X-RateLimit-Limit': String(rateLimit.limit),
+            'X-RateLimit-Remaining': '0',
+          },
+        }
+      );
+    }
+
     const body = await req.json();
     const { document, question } = body as { document: LegalDocument; question: string };
 
@@ -35,10 +53,18 @@ export async function POST(req: NextRequest) {
 
     const result = await askDocumentQuestion(document, question.trim());
 
-    return NextResponse.json({
-      success: true,
-      result,
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        result,
+      },
+      {
+        headers: {
+          'X-RateLimit-Limit': String(rateLimit.limit),
+          'X-RateLimit-Remaining': String(rateLimit.remaining),
+        },
+      }
+    );
   } catch (error: unknown) {
     safeLogError('Ask route failure', error);
     const message = getSafeErrorMessage(error, 'An internal error occurred during Q&A retrieval.');

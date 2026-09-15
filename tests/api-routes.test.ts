@@ -174,6 +174,8 @@ describe('HTTP API Route Handlers Integration Test Suite', () => {
       expect(json.result).toBeDefined();
       expect(json.result.answer).toBeDefined();
       expect(json.result.safetyDisclaimer).toContain('NyayaLens is an AI-powered legal document understanding platform');
+      expect(res.headers.get('X-RateLimit-Limit')).toBe('60');
+      expect(res.headers.get('X-RateLimit-Remaining')).toBeDefined();
     });
   });
 

@@ -3,11 +3,29 @@ import { ingestDocument, ingestRawText, IngestionError, IngestionResult, sanitiz
 import { analyzeLegalDocument } from '@/lib/grounded-ai-engine';
 import { safeLogError, getSafeErrorMessage } from '@/lib/security/error-sanitizer';
 
+import { checkRateLimit } from '@/lib/security/rate-limiter';
+
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
   try {
+    // 1. Rate Limiting Check (30 doc analyses/min per client)
+    const rateLimit = checkRateLimit(req, { maxRequests: 30, windowMs: 60000 });
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { success: false, error: 'Too many analysis requests. Please wait a moment before analyzing another document.', errorCode: 'RATE_LIMITED' },
+        {
+          status: 429,
+          headers: {
+            'Retry-After': String(rateLimit.resetSeconds),
+            'X-RateLimit-Limit': String(rateLimit.limit),
+            'X-RateLimit-Remaining': '0',
+          },
+        }
+      );
+    }
+
     const contentType = req.headers.get('content-type') || '';
     let ingestionResult: IngestionResult;
 
@@ -73,22 +91,30 @@ export async function POST(req: NextRequest) {
       ingestionResult.fileSize
     );
 
-    return NextResponse.json({
-      success: true,
-      document: analysisResult,
-      ingestion: {
-        id: ingestionResult.id,
-        sections: ingestionResult.sections,
-        metadata: ingestionResult.metadata,
-        chunks: ingestionResult.chunks,
-        security: {
-          hasPromptInjectionAttempt: ingestionResult.security.hasPromptInjectionAttempt,
-          detectedInjectionPatterns: ingestionResult.security.detectedInjectionPatterns,
-          piiRedacted: ingestionResult.security.piiRedacted,
-          redactionCount: ingestionResult.security.redactionCount,
+    return NextResponse.json(
+      {
+        success: true,
+        document: analysisResult,
+        ingestion: {
+          id: ingestionResult.id,
+          sections: ingestionResult.sections,
+          metadata: ingestionResult.metadata,
+          chunks: ingestionResult.chunks,
+          security: {
+            hasPromptInjectionAttempt: ingestionResult.security.hasPromptInjectionAttempt,
+            detectedInjectionPatterns: ingestionResult.security.detectedInjectionPatterns,
+            piiRedacted: ingestionResult.security.piiRedacted,
+            redactionCount: ingestionResult.security.redactionCount,
+          },
         },
       },
-    });
+      {
+        headers: {
+          'X-RateLimit-Limit': String(rateLimit.limit),
+          'X-RateLimit-Remaining': String(rateLimit.remaining),
+        },
+      }
+    );
   } catch (error: unknown) {
     if (error instanceof IngestionError) {
       return NextResponse.json(

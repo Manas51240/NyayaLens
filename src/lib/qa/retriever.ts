@@ -15,8 +15,15 @@ const LEGAL_SYNONYM_MAP: Record<string, string[]> = {
   confidentiality: ['confidential information', 'proprietary', 'non-disclosure', 'trade secret'],
 };
 
+import { getOrBuildDocumentIndex } from './document-indexer';
+
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 /**
  * Multi-stage legal evidence retriever searching document text, sections, and clauses.
+ * Optimized with DocumentIndex and pre-compiled regex patterns for sub-millisecond execution.
  */
 export function retrieveEvidence(
   document: LegalDocument,
@@ -42,11 +49,23 @@ export function retrieveEvidence(
     }
   }
 
-  const raw = document.rawText;
-  const paragraphs = raw
-    .split(/\n\s*\n/)
-    .map((p) => p.trim())
-    .filter((p) => p.length > 20);
+  // Precompile query regexes ONCE before scanning paragraphs
+  const primaryMatchers = primaryTopics.map((term) => ({
+    term,
+    isSingleWord: !term.includes(' ') && !term.includes('-'),
+    regex: new RegExp(`\\b${escapeRegex(term)}\\b`, 'i'),
+  }));
+
+  const synonymMatchers = Array.from(expandedTerms)
+    .filter((t) => !primaryTopics.includes(t))
+    .map((term) => ({
+      term,
+      isSingleWord: !term.includes(' ') && !term.includes('-'),
+      regex: new RegExp(`\\b${escapeRegex(term)}\\b`, 'i'),
+    }));
+
+  // Retrieve pre-built or cached document index (avoids repeated parsing/splitting)
+  const docIndex = getOrBuildDocumentIndex(document);
 
   interface ScoredParagraph {
     text: string;
@@ -58,30 +77,31 @@ export function retrieveEvidence(
 
   const scoredParagraphs: ScoredParagraph[] = [];
 
-  for (let i = 0; i < paragraphs.length; i++) {
-    const para = paragraphs[i];
-    const paraLower = para.toLowerCase().replace(/[-_]/g, ' ');
-
+  for (let i = 0; i < docIndex.paragraphs.length; i++) {
+    const para = docIndex.paragraphs[i];
     let score = 0;
     const matchedTerms: string[] = [];
 
     // Check primary topics (higher weight)
-    for (const term of primaryTopics) {
-      const termRegex = new RegExp(`\\b${term}\\b`, 'i');
-      if (termRegex.test(paraLower)) {
+    for (const matcher of primaryMatchers) {
+      // Fast O(1) set pre-filter for single words
+      if (matcher.isSingleWord && !para.words.has(matcher.term)) {
+        continue;
+      }
+      if (matcher.regex.test(para.textLower)) {
         score += 5;
-        matchedTerms.push(term);
+        matchedTerms.push(matcher.term);
       }
     }
 
     // Check expanded synonyms (medium weight)
-    for (const term of expandedTerms) {
-      if (!primaryTopics.includes(term)) {
-        const termRegex = new RegExp(`\\b${term}\\b`, 'i');
-        if (termRegex.test(paraLower)) {
-          score += 2;
-          matchedTerms.push(term);
-        }
+    for (const matcher of synonymMatchers) {
+      if (matcher.isSingleWord && !para.words.has(matcher.term)) {
+        continue;
+      }
+      if (matcher.regex.test(para.textLower)) {
+        score += 2;
+        matchedTerms.push(matcher.term);
       }
     }
 
@@ -95,11 +115,8 @@ export function retrieveEvidence(
       score += 4;
     }
 
-    // Extract section header if present in paragraph
-    let sectionTitle = 'Document Excerpt';
-    const firstLine = para.split('\n')[0].trim();
-    if (/^(SECTION|ARTICLE|§|[0-9]{1,2}\.)/i.test(firstLine) && firstLine.length < 70) {
-      sectionTitle = firstLine;
+    // Header score bonus
+    if (/^(SECTION|ARTICLE|§|[0-9]{1,2}\.)/i.test(para.sectionTitle)) {
       score += 2;
     }
 
@@ -107,40 +124,39 @@ export function retrieveEvidence(
     const minMatchedRequired = Math.min(2, primaryTopics.length);
     if (matchedTerms.length >= minMatchedRequired || score >= 9) {
       scoredParagraphs.push({
-        text: para,
+        text: para.text,
         score,
         matchedTerms,
-        sectionTitle,
-        lineIndex: i + 1,
+        sectionTitle: para.sectionTitle,
+        lineIndex: para.lineIndex,
       });
     }
   }
 
   // Also search parsed document clauses for structured matches
-  if (Array.isArray(document.clauses)) {
-    for (const clause of document.clauses) {
-      const clauseTextLower = (clause.title + ' ' + clause.originalText + ' ' + clause.plainEnglishTranslation).toLowerCase();
-      let clauseScore = 0;
-      const clauseMatchedTerms: string[] = [];
+  for (const clause of docIndex.clauses) {
+    let clauseScore = 0;
+    const clauseMatchedTerms: string[] = [];
 
-      for (const term of primaryTopics) {
-        const termRegex = new RegExp(`\\b${term}\\b`, 'i');
-        if (termRegex.test(clauseTextLower)) {
-          clauseScore += 4;
-          clauseMatchedTerms.push(term);
-        }
+    for (const matcher of primaryMatchers) {
+      if (matcher.isSingleWord && !clause.words.has(matcher.term)) {
+        continue;
       }
+      if (matcher.regex.test(clause.textLower)) {
+        clauseScore += 4;
+        clauseMatchedTerms.push(matcher.term);
+      }
+    }
 
-      const minClauseMatches = Math.min(2, primaryTopics.length);
-      if (clauseMatchedTerms.length >= minClauseMatches && clauseScore >= 4) {
-        scoredParagraphs.push({
-          text: clause.originalText,
-          score: clauseScore + 2,
-          matchedTerms: clauseMatchedTerms,
-          sectionTitle: clause.sourceSection || clause.title,
-          lineIndex: 1,
-        });
-      }
+    const minClauseMatches = Math.min(2, primaryTopics.length);
+    if (clauseMatchedTerms.length >= minClauseMatches && clauseScore >= 4) {
+      scoredParagraphs.push({
+        text: clause.originalText,
+        score: clauseScore + 2,
+        matchedTerms: clauseMatchedTerms,
+        sectionTitle: clause.sectionTitle,
+        lineIndex: 1,
+      });
     }
   }
 

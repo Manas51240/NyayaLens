@@ -7,7 +7,7 @@
 [![Next.js](https://img.shields.io/badge/Next.js-15.5.25-black?style=flat&logo=next.js)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue?style=flat&logo=typescript)](https://www.typescriptlang.org/)
 [![Tailwind CSS](https://img.shields.io/badge/TailwindCSS-3.4-38bdf8?style=flat&logo=tailwind-css)](https://tailwindcss.com/)
-[![Tests](https://img.shields.io/badge/Vitest-121%20Passed%20(11%20Suites)-emerald)](https://vitest.dev/)
+[![Tests](https://img.shields.io/badge/Vitest-127%20Passed%20(12%20Suites)-emerald)](https://vitest.dev/)
 [![Accessibility](https://img.shields.io/badge/Accessibility-WCAG%202.1%20AA%20Oriented-success)](#accessibility)
 
 ---
@@ -143,18 +143,19 @@ NyayaLens features a WCAG 2.1 AA–oriented accessibility implementation designe
 
 ## Testing & Verification
 
-NyayaLens includes a comprehensive Vitest test suite (`tests/`) containing **121 automated tests across 11 test suites**:
-1. `tests/modality-preservation.test.ts`: Contractual modality preservation guardian (shall, must, may, can, will, unless, subject to).
-2. `tests/evidence-grounded-qa.test.ts`: 8-stage Q&A pipeline, semantic retrieval, strict structured output schema validation, natural language query expansion.
-3. `tests/prompt-injection.test.ts`: Boundary break-out defense, adversarial query blocking, and client-side PII redaction.
-4. `tests/grounding-and-hallucination.test.ts`: Grounding integrity, quote fidelity, and citation verification.
-5. `tests/comparison.test.ts`: 9-dimension semantic comparison engine with neutral review priorities.
-6. `tests/safety-disclaimers.test.ts`: Legal disclaimer attachment and outcome certainty reframing.
-7. `tests/hallucination-resistance.test.ts`: Absence detection, quote verification, unsupported claim rejection.
-8. `tests/extraction-and-validation.test.ts`: PDF/DOCX format validation, 10MB file ceiling enforcement.
-9. `tests/ingestion-pipeline.test.ts`: Multi-stage document ingestion, magic byte checking, section detection, normalization.
-10. `tests/security-audit.test.ts`: 14-domain security audit (direct/indirect injection, zero-width evasion, markdown exfiltration, credentials redaction).
-11. `tests/api-routes.test.ts`: Next.js HTTP API route handlers (`/api/analyze`, `/api/ask`, `/api/compare`), payload limits, status codes.
+NyayaLens includes a comprehensive Vitest test suite (`tests/`) containing **127 automated tests across 12 test suites**:
+1. `tests/performance-and-efficiency.test.ts`: Multi-query document indexing benchmarks, request deduplication, prompt caching, rate limiting, and cache isolation.
+2. `tests/modality-preservation.test.ts`: Contractual modality preservation guardian (shall, must, may, can, will, unless, subject to).
+3. `tests/evidence-grounded-qa.test.ts`: 8-stage Q&A pipeline, semantic retrieval, strict structured output schema validation, natural language query expansion.
+4. `tests/prompt-injection.test.ts`: Boundary break-out defense, adversarial query blocking, and client-side PII redaction.
+5. `tests/grounding-and-hallucination.test.ts`: Grounding integrity, quote fidelity, and citation verification.
+6. `tests/comparison.test.ts`: 9-dimension semantic comparison engine with neutral review priorities.
+7. `tests/safety-disclaimers.test.ts`: Legal disclaimer attachment and outcome certainty reframing.
+8. `tests/hallucination-resistance.test.ts`: Absence detection, quote verification, unsupported claim rejection.
+9. `tests/extraction-and-validation.test.ts`: PDF/DOCX format validation, 10MB file ceiling enforcement.
+10. `tests/ingestion-pipeline.test.ts`: Multi-stage document ingestion, magic byte checking, section detection, normalization.
+11. `tests/security-audit.test.ts`: 14-domain security audit (direct/indirect injection, zero-width evasion, markdown exfiltration, credentials redaction).
+12. `tests/api-routes.test.ts`: Next.js HTTP API route handlers (`/api/analyze`, `/api/ask`, `/api/compare`), payload limits, status codes.
 
 To run the automated tests:
 ```bash
