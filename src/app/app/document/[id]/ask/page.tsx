@@ -9,6 +9,7 @@ import { LegalDocument } from '@/types/legal';
 import { AppShell } from '@/components/layout/AppShell';
 import { DocumentNavTabs } from '@/components/document/DocumentNavTabs';
 import { AskDocumentChat } from '@/components/document/AskDocumentChat';
+import { EvidenceDrawer } from '@/components/document/EvidenceDrawer';
 import { WorkspaceSkeleton } from '@/components/common/SkeletonLoaders';
 import { EmptyState } from '@/components/common/EmptyState';
 
@@ -17,6 +18,7 @@ export default function DocumentAskPage() {
   const id = params?.id as string;
   const [doc, setDoc] = useState<LegalDocument | null>(null);
   const [loading, setLoading] = useState(true);
+  const [inspectCitation, setInspectCitation] = useState<{ quote: string; section: string } | null>(null);
 
   useEffect(() => {
     if (id) {
@@ -94,8 +96,22 @@ export default function DocumentAskPage() {
 
         {/* Main Grounded Chat Container */}
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
-          <AskDocumentChat document={doc} />
+          <AskDocumentChat
+            document={doc}
+            onInspectCitation={(quote, section) => setInspectCitation({ quote, section })}
+          />
         </div>
+
+        {/* Grounded Evidence Drawer */}
+        <EvidenceDrawer
+          isOpen={!!inspectCitation}
+          onClose={() => setInspectCitation(null)}
+          title={`Grounded Evidence: ${inspectCitation?.section || 'Contract Clause'}`}
+          category="CITED_EVIDENCE"
+          sourceSection={inspectCitation?.section || 'Retrieved Clause'}
+          quote={inspectCitation?.quote || ''}
+          confidence={95}
+        />
       </div>
     </AppShell>
   );

@@ -26,6 +26,7 @@ import { LegalDocument, ComparisonResult, SemanticDeltaItem } from '@/types/lega
 import { getStoredDocuments } from '@/lib/storage';
 import { SAMPLE_DOCUMENTS, SAMPLE_NDA_V2_REVISED } from '@/lib/sample-documents';
 import { AppShell } from '@/components/layout/AppShell';
+import { ErrorState } from '@/components/common/ErrorState';
 
 const DIMENSION_TABS: { key: string; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { key: 'all', label: 'All Dimensions', icon: Layers },
@@ -46,6 +47,7 @@ export default function ComparePage() {
   const [docBId, setDocBId] = useState<string>('');
   const [comparison, setComparison] = useState<ComparisonResult | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   const [activeTab, setActiveTab] = useState<string>('all');
 
@@ -72,6 +74,7 @@ export default function ComparePage() {
 
   const triggerCompare = async (a: LegalDocument, b: LegalDocument) => {
     setLoading(true);
+    setError(null);
     try {
       const res = await fetch('/api/compare', {
         method: 'POST',
@@ -79,11 +82,13 @@ export default function ComparePage() {
         body: JSON.stringify({ docA: a, docB: b }),
       });
       const data = await res.json();
-      if (data.comparison) {
-        setComparison(data.comparison);
+      if (!res.ok || !data.comparison) {
+        throw new Error(data.error || 'Failed to compare documents.');
       }
-    } catch (e) {
-      console.error('Comparison call failed:', e);
+      setComparison(data.comparison);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'An unexpected error occurred during document comparison.';
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -134,6 +139,16 @@ export default function ComparePage() {
             </p>
           </div>
         </div>
+
+        {/* Error Notification */}
+        {error && (
+          <ErrorState
+            title="Contract Comparison Error"
+            message={error}
+            onRetry={handleRunComparison}
+            onDismiss={() => setError(null)}
+          />
+        )}
 
         {/* Selectors Bar */}
         <div className="bg-white border border-slate-200 rounded-lg p-5 shadow-2xs space-y-4">
@@ -297,7 +312,17 @@ export default function ComparePage() {
             </div>
 
             {/* Semantic Deltas Grid / List */}
-            {filteredDeltas.length === 0 ? (
+            {allDeltaItems.length === 0 ? (
+              <div className="p-10 text-center bg-white border border-slate-200 rounded-lg space-y-3">
+                <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto">
+                  <CheckCircle2 className="w-6 h-6" />
+                </div>
+                <h3 className="text-base font-bold text-slate-900">Identical Contractual Structure</h3>
+                <p className="text-xs sm:text-sm text-slate-600 max-w-md mx-auto leading-relaxed">
+                  No substantive contractual variations, date deviations, or liability shifts were detected between Document A and Document B across all 9 evaluated legal dimensions. Both documents reflect substantively identical provisions.
+                </p>
+              </div>
+            ) : filteredDeltas.length === 0 ? (
               <div className="p-8 text-center bg-white border border-slate-200 rounded-lg space-y-2">
                 <CheckCircle2 className="w-6 h-6 text-emerald-600 mx-auto" />
                 <h3 className="text-sm font-bold text-slate-800">No Variations in Selected Dimension</h3>

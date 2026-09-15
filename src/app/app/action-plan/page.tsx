@@ -13,7 +13,8 @@ import {
   Clock,
   AlertTriangle,
   ArrowRight,
-  Filter
+  Filter,
+  RotateCcw
 } from 'lucide-react';
 import { getStoredDocuments, getStoredDocumentById } from '@/lib/storage';
 import { LegalDocument, ActionItem } from '@/types/legal';
@@ -31,21 +32,70 @@ function ActionPlanContent() {
   useEffect(() => {
     const docs = getStoredDocuments();
     setDocuments(docs);
+    let targetDocId = '';
     if (docIdParam && docs.some((d) => d.id === docIdParam)) {
-      setSelectedDocId(docIdParam);
+      targetDocId = docIdParam;
     } else if (docs.length > 0) {
-      setSelectedDocId(docs[0].id);
+      targetDocId = docs[0].id;
+    }
+    setSelectedDocId(targetDocId);
+
+    // Restore persisted checklist state from localStorage
+    if (targetDocId && typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem(`nyayalens_action_plan_${targetDocId}`);
+        if (saved) {
+          setCompletedItems(JSON.parse(saved));
+        } else {
+          setCompletedItems({});
+        }
+      } catch {
+        setCompletedItems({});
+      }
     }
     setMounted(true);
   }, [docIdParam]);
 
-  const activeDoc = documents.find((d) => d.id === selectedDocId);
+  const handleSelectDoc = (newDocId: string) => {
+    setSelectedDocId(newDocId);
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem(`nyayalens_action_plan_${newDocId}`);
+        if (saved) {
+          setCompletedItems(JSON.parse(saved));
+        } else {
+          setCompletedItems({});
+        }
+      } catch {
+        setCompletedItems({});
+      }
+    }
+  };
 
   const toggleComplete = (itemId: string) => {
-    setCompletedItems((prev) => ({
-      ...prev,
-      [itemId]: !prev[itemId],
-    }));
+    setCompletedItems((prev) => {
+      const updated = {
+        ...prev,
+        [itemId]: !prev[itemId],
+      };
+      if (selectedDocId && typeof window !== 'undefined') {
+        try {
+          localStorage.setItem(`nyayalens_action_plan_${selectedDocId}`, JSON.stringify(updated));
+        } catch {
+          // Gracefully handle storage quota
+        }
+      }
+      return updated;
+    });
+  };
+
+  const handleResetChecklist = () => {
+    if (selectedDocId && typeof window !== 'undefined') {
+      try {
+        localStorage.removeItem(`nyayalens_action_plan_${selectedDocId}`);
+      } catch {}
+    }
+    setCompletedItems({});
   };
 
   const handlePrint = () => {
@@ -53,6 +103,8 @@ function ActionPlanContent() {
       window.print();
     }
   };
+
+  const activeDoc = documents.find((d) => d.id === selectedDocId);
 
   if (!mounted) return null;
 
@@ -93,12 +145,13 @@ function ActionPlanContent() {
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5 flex-wrap">
             {documents.length > 1 && (
               <select
                 value={selectedDocId}
-                onChange={(e) => setSelectedDocId(e.target.value)}
+                onChange={(e) => handleSelectDoc(e.target.value)}
                 className="text-xs p-2 border border-slate-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-slate-900 font-medium"
+                aria-label="Select document for action plan"
               >
                 {documents.map((d) => (
                   <option key={d.id} value={d.id}>
@@ -107,6 +160,15 @@ function ActionPlanContent() {
                 ))}
               </select>
             )}
+
+            <button
+              onClick={handleResetChecklist}
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 text-xs font-semibold rounded-md transition-colors"
+              title="Reset all checked items for this document"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Reset</span>
+            </button>
 
             <button
               onClick={handlePrint}

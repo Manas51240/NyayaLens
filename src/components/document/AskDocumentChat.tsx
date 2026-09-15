@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { LegalDocument, AskDocumentResponse } from '@/types/legal';
 import {
   Send,
@@ -12,11 +12,16 @@ import {
   Sparkles,
   ShieldCheck,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Copy,
+  Check,
+  RotateCcw,
+  ExternalLink
 } from 'lucide-react';
 
 interface AskDocumentChatProps {
   document: LegalDocument;
+  onInspectCitation?: (quote: string, section: string) => void;
 }
 
 interface ChatMessage {
@@ -27,17 +32,33 @@ interface ChatMessage {
   responsePayload?: AskDocumentResponse;
 }
 
-export const AskDocumentChat: React.FC<AskDocumentChatProps> = ({ document }) => {
+export const AskDocumentChat: React.FC<AskDocumentChatProps> = ({
+  document,
+  onInspectCitation,
+}) => {
   const [question, setQuestion] = useState('');
   const [loading, setLoading] = useState(false);
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: 'welcome',
-      sender: 'assistant',
-      text: `Hello! I am your grounded legal document assistant for "${document.title}". Ask me any question about the obligations, terms, notice periods, or clauses in this document. Every answer I provide will cite exact excerpts from the text. If a term is not in the document, I will clearly state that it cannot be found.`,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    },
-  ]);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const initialGreeting = (): ChatMessage => ({
+    id: `welcome-${Date.now()}`,
+    sender: 'assistant',
+    text: `Hello! I am your grounded legal document assistant for "${document.title}". Ask me any question about the obligations, terms, notice periods, or clauses in this document. Every answer I provide will cite exact excerpts from the text. If a term is not in the document, I will clearly state that it cannot be found.`,
+    timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+  });
+
+  const [messages, setMessages] = useState<ChatMessage[]>([initialGreeting()]);
+
+  // Reset chat greeting when switching documents
+  useEffect(() => {
+    setMessages([initialGreeting()]);
+  }, [document.id, document.title]);
+
+  // Auto-scroll to bottom whenever messages or loading state changes
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, loading]);
 
   const suggestedQuestions = [
     'What are my termination notice obligations?',
@@ -101,9 +122,26 @@ export const AskDocumentChat: React.FC<AskDocumentChatProps> = ({ document }) =>
     }
   };
 
+  const handleCopyAnswer = (id: string, text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const handleClearHistory = () => {
+    setMessages([
+      {
+        id: `welcome-${Date.now()}`,
+        sender: 'assistant',
+        text: `Chat history cleared. Ready for new inquiries regarding "${document.title}".`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      },
+    ]);
+  };
+
   return (
     <div className="bg-white border border-slate-200 rounded-lg shadow-2xs flex flex-col h-[700px]">
-      {/* Header */}
+      {/* Header with Clear History and Status */}
       <div className="p-4 border-b border-slate-200 bg-slate-50/70 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-md bg-slate-900 text-amber-400 flex items-center justify-center">
@@ -118,9 +156,19 @@ export const AskDocumentChat: React.FC<AskDocumentChatProps> = ({ document }) =>
             </span>
           </div>
         </div>
-        <span className="text-[11px] text-slate-500 bg-slate-200/70 px-2 py-0.5 rounded font-mono">
-          Anti-Hallucination Active
-        </span>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleClearHistory}
+            className="inline-flex items-center gap-1 text-xs text-slate-600 hover:text-slate-900 px-2.5 py-1 rounded bg-white border border-slate-200 hover:bg-slate-100 transition-colors shadow-2xs"
+            title="Clear Chat History"
+          >
+            <RotateCcw className="w-3 h-3" />
+            <span className="hidden sm:inline">Clear</span>
+          </button>
+          <span className="text-[11px] text-slate-600 bg-slate-200/70 px-2 py-0.5 rounded font-mono">
+            Anti-Hallucination Active
+          </span>
+        </div>
       </div>
 
       {/* Suggested Prompt Chips */}
@@ -141,7 +189,12 @@ export const AskDocumentChat: React.FC<AskDocumentChatProps> = ({ document }) =>
       </div>
 
       {/* Chat Messages Feed */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div
+        className="flex-1 overflow-y-auto p-4 space-y-4"
+        role="log"
+        aria-live="polite"
+        aria-label="Document question and answer conversation"
+      >
         {messages.map((msg) => (
           <div
             key={msg.id}
@@ -164,13 +217,27 @@ export const AskDocumentChat: React.FC<AskDocumentChatProps> = ({ document }) =>
                     <span>Retrieved Document Evidence:</span>
                   </div>
                   {msg.responsePayload.groundedEvidence.map((ev, i) => (
-                    <div key={i} className="bg-white border border-slate-200 rounded p-2.5 text-xs text-slate-700 font-mono">
+                    <div
+                      key={i}
+                      onClick={() => onInspectCitation && onInspectCitation(ev.quote, ev.section)}
+                      className={`bg-white border border-slate-200 rounded p-2.5 text-xs text-slate-700 font-mono transition-all ${
+                        onInspectCitation
+                          ? 'cursor-pointer hover:border-amber-400 hover:shadow-xs group'
+                          : ''
+                      }`}
+                      title={onInspectCitation ? 'Click to inspect in Evidence Drawer' : undefined}
+                    >
                       <blockquote className="italic border-l-2 border-amber-500 pl-2">
                         "{ev.quote}"
                       </blockquote>
-                      <div className="flex items-center justify-between text-[10px] text-slate-400 font-sans mt-1.5">
-                        <span>Source: {ev.section}</span>
-                        <span>Confidence: {ev.confidence}%</span>
+                      <div className="flex items-center justify-between text-[10px] text-slate-500 font-sans mt-1.5">
+                        <span className="font-semibold text-slate-700">Source: {ev.section}</span>
+                        <div className="flex items-center gap-1">
+                          <span>Confidence: {ev.confidence}%</span>
+                          {onInspectCitation && (
+                            <ExternalLink className="w-3 h-3 text-slate-400 group-hover:text-amber-600 transition-colors" />
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -206,7 +273,31 @@ export const AskDocumentChat: React.FC<AskDocumentChatProps> = ({ document }) =>
                   </div>
                 )}
             </div>
-            <span className="text-[10px] text-slate-400 mt-1 px-1">{msg.timestamp}</span>
+
+            {/* Message Meta Bar with Copy and Timestamp */}
+            <div className="flex items-center gap-2 mt-1 px-1 text-[10px] text-slate-500">
+              <span>{msg.timestamp}</span>
+              {msg.sender === 'assistant' && (
+                <button
+                  onClick={() => handleCopyAnswer(msg.id, msg.text)}
+                  className="inline-flex items-center gap-0.5 hover:text-slate-800 transition-colors"
+                  title="Copy Answer"
+                  aria-label="Copy Answer"
+                >
+                  {copiedId === msg.id ? (
+                    <>
+                      <Check className="w-3 h-3 text-emerald-600" />
+                      <span className="text-emerald-600">Copied</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3 h-3" />
+                      <span>Copy</span>
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
           </div>
         ))}
 
@@ -216,6 +307,8 @@ export const AskDocumentChat: React.FC<AskDocumentChatProps> = ({ document }) =>
             <span>Searching document text & citations...</span>
           </div>
         )}
+
+        <div ref={messagesEndRef} />
       </div>
 
       {/* Input Form */}

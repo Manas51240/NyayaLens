@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   X,
   Quote,
@@ -39,6 +39,30 @@ export const EvidenceDrawer: React.FC<EvidenceDrawerProps> = ({
   onAskQuestion,
 }) => {
   const [copied, setCopied] = useState(false);
+  const closeBtnRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    // Focus close button on open
+    closeBtnRef.current?.focus();
+
+    // Dismiss on Escape key
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -50,12 +74,20 @@ export const EvidenceDrawer: React.FC<EvidenceDrawerProps> = ({
   };
 
   return (
-    <aside
-      className="fixed inset-y-0 right-0 z-50 w-full sm:w-[480px] bg-white border-l border-slate-200 shadow-2xl flex flex-col transform transition-transform ease-in-out duration-300"
-      role="dialog"
-      aria-label={`Evidence Inspector for ${title}`}
-      aria-modal="true"
-    >
+    <>
+      {/* Accessible Backdrop Overlay */}
+      <div
+        className="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-xs transition-opacity animate-in fade-in duration-200"
+        onClick={onClose}
+        aria-hidden="true"
+      />
+
+      <aside
+        className="fixed inset-y-0 right-0 z-50 w-full sm:w-[480px] bg-white border-l border-slate-200 shadow-2xl flex flex-col transform transition-transform ease-in-out duration-300"
+        role="dialog"
+        aria-label={`Evidence Inspector for ${title}`}
+        aria-modal="true"
+      >
       {/* Header */}
       <div className="p-4 sm:p-5 border-b border-slate-200 flex items-center justify-between bg-slate-50/80">
         <div className="flex items-center gap-2">
@@ -70,6 +102,7 @@ export const EvidenceDrawer: React.FC<EvidenceDrawerProps> = ({
           </div>
         </div>
         <button
+          ref={closeBtnRef}
           onClick={onClose}
           className="p-1.5 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-900"
           aria-label="Close evidence inspector"
@@ -163,5 +196,6 @@ export const EvidenceDrawer: React.FC<EvidenceDrawerProps> = ({
         )}
       </div>
     </aside>
+    </>
   );
 };

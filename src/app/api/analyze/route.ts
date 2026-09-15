@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { ingestDocument, ingestRawText, IngestionError, IngestionResult } from '@/lib/ingestion';
+import { ingestDocument, ingestRawText, IngestionError, IngestionResult, sanitizeFileName } from '@/lib/ingestion';
 import { analyzeLegalDocument } from '@/lib/grounded-ai-engine';
 import { safeLogError, getSafeErrorMessage } from '@/lib/security/error-sanitizer';
 
@@ -54,10 +54,13 @@ export async function POST(req: NextRequest) {
         );
       }
 
+      const safeFileName = sanitizeFileName(body.fileName || 'Pasted_Document.txt');
+      const validFileType = body.fileType === 'md' ? 'md' : 'txt';
+
       ingestionResult = ingestRawText({
         rawText: body.rawText,
-        fileName: body.fileName || 'Pasted_Document.txt',
-        fileType: body.fileType || 'txt',
+        fileName: safeFileName,
+        fileType: validFileType,
         enablePiiPreRedaction: !!body.enablePiiPreRedaction,
       });
     }
