@@ -7,7 +7,7 @@
 [![Next.js](https://img.shields.io/badge/Next.js-15.5.25-black?style=flat&logo=next.js)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue?style=flat&logo=typescript)](https://www.typescriptlang.org/)
 [![Tailwind CSS](https://img.shields.io/badge/TailwindCSS-3.4-38bdf8?style=flat&logo=tailwind-css)](https://tailwindcss.com/)
-[![Tests](https://img.shields.io/badge/Vitest-108%20Passed-emerald)](https://vitest.dev/)
+[![Tests](https://img.shields.io/badge/Vitest-121%20Passed%20(11%20Suites)-emerald)](https://vitest.dev/)
 [![WCAG](https://img.shields.io/badge/Accessibility-WCAG%202.1%20AA-success)](#accessibility)
 
 ---
@@ -55,15 +55,16 @@ Legal agreements govern the most consequential relationships in modern life—em
 
 **NyayaLens** ("Nyaya" from Sanskrit for *Justice/Righteousness*, combined with *Lens* for clarity) acts as a structured legal comprehension bridge:
 
-1. **Grounded Document Ingestion**: Upload PDF, DOCX, TXT, or Markdown documents (or test with 4 pre-loaded real-world contracts).
+1. **Grounded Document Ingestion**: Upload PDF, DOCX, TXT, or Markdown documents (or explore 4 real-world sandboxes). Scans magic bytes, sanitizes paths, and isolates untrusted inputs.
 2. **Plain-Language Clause Translation**: Side-by-side translation of complex covenants into plain English with direct quote references.
 3. **Legal Risk Radar (10 Required Categories)**:
    - *termination*, *payment*, *liability*, *renewal*, *confidentiality*, *privacy/data*, *dispute resolution*, *restrictive covenants*, *penalties*, *unusual obligations*.
-   - Clearly rated by AI-identified *review priority* (`high`, `medium`, `low`, `informational`), never as a legal enforceability judgment.
-4. **Evidence-Grounded Inquiries (Ask Document)**: Questions are answered strictly using retrieved document evidence with page/section citations. If an item is absent from the text, NyayaLens explicitly issues an absence notice.
-5. **Contract Delta Comparison**: Compare Original Agreements vs Counterparty Redlines (v1 vs v2) across 9 legal dimensions with neutral review priorities.
-6. **Action Plan Generator**: Generates actionable execution checklists, calendar notice windows, and documents to gather, with automatic local persistence across sessions.
-7. **Lawyer Consultation Brief**: Generates a professional, printable memorandum containing executive facts, flagged clauses, and prioritized questions for legal counsel.
+   - Rated strictly by objective *review priority* (`high`, `medium`, `low`, `informational`), never as subjective legal conclusions.
+4. **Gemini 2.5 Flash Grounded Q&A**: Strict structured JSON output, contiguous quote verification, and explicit absence detection. If absent, NyayaLens declares silence rather than hallucinating.
+5. **Modality Guardian**: Preserves contractual modal verbs (`shall`, `must`, `may`, `unless`, `subject to`) so permissive options never become mandatory commands.
+6. **Contract Delta Comparison**: Compare Original Agreements vs Counterparty Redlines (v1 vs v2) across 9 legal dimensions with neutral review priorities.
+7. **Action Plan Generator**: Generates actionable execution checklists, calendar notice windows, and documents to gather, with automatic local persistence across sessions.
+8. **Lawyer Consultation Brief**: Generates a professional, printable memorandum containing executive facts, flagged clauses, and prioritized questions for legal counsel.
 
 ---
 

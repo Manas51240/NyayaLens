@@ -2,7 +2,7 @@ import { LegalDocument } from '@/types/legal';
 import { GroundedQAResponse } from './types';
 import { classifyQueryIntent } from './intent-classifier';
 import { retrieveEvidence } from './retriever';
-import { generateGroundedAnswer } from './answer-generator';
+import { generateGroundedAnswerAsync } from './answer-generator';
 import { calculateGroundedConfidence } from './confidence-calculator';
 import {
   validateQASafety,
@@ -16,9 +16,9 @@ import {
  * → intent classification
  * → retrieval
  * → relevant evidence
- * → AI answer
- * → evidence references
- * → confidence
+ * → AI answer (Gemini 2.5 Flash synthesis with strict schema & fallback)
+ * → evidence verification
+ * → confidence calculation
  * → safety validation
  */
 export async function runGroundedQAPipeline(
@@ -37,11 +37,11 @@ export async function runGroundedQAPipeline(
     rawText: sanitizedRawText,
   };
 
-  // 3. Evidence Retrieval
+  // 3. Evidence Retrieval (Deterministic multi-stage retrieval of top chunks)
   const retrievalResult = retrieveEvidence(secureDoc, intentResult);
 
-  // 4. Grounded AI Answer Generation (Constrained to Evidence)
-  const answerResult = generateGroundedAnswer(
+  // 4. Grounded AI Answer Generation (Gemini 2.5 Flash when available + deterministic fallback)
+  const answerResult = await generateGroundedAnswerAsync(
     secureDoc,
     cleanQuestion,
     intentResult,
@@ -49,10 +49,21 @@ export async function runGroundedQAPipeline(
   );
 
   // 5. Evidence References & Confidence Scoring
-  const { confidence, evidenceReferences } = calculateGroundedConfidence(
-    retrievalResult,
-    answerResult.notFoundInDocument
-  );
+  let finalEvidence = answerResult.evidenceOverride;
+  let finalConfidence = 0;
+
+  if (!finalEvidence || finalEvidence.length === 0) {
+    const { confidence, evidenceReferences } = calculateGroundedConfidence(
+      retrievalResult,
+      answerResult.notFoundInDocument
+    );
+    finalConfidence = answerResult.confidenceOverride !== undefined
+      ? answerResult.confidenceOverride
+      : confidence;
+    finalEvidence = evidenceReferences;
+  } else {
+    finalConfidence = answerResult.confidenceOverride ?? 85;
+  }
 
   // 6. Safety Validation & Legal Guardrail Enforcement
   const { validatedAnswer, safetyValidation } = validateQASafety(answerResult.answer);
@@ -62,12 +73,16 @@ export async function runGroundedQAPipeline(
     intent: intentResult,
     retrieval: retrievalResult,
     answer: validatedAnswer,
-    groundedEvidence: evidenceReferences,
+    groundedEvidence: finalEvidence,
     notFoundInDocument: answerResult.notFoundInDocument,
     missingInformationNotice: answerResult.missingInformationNotice,
     suggestedFollowUpQuestions: answerResult.suggestedFollowUpQuestions,
-    confidence,
+    confidence: finalConfidence,
     safetyValidation,
     safetyDisclaimer: LEGAL_DISCLAIMER_NOTICE,
+    answerType: answerResult.answerType,
+    limitations: answerResult.limitations,
+    isVerbatimEvidence: answerResult.isVerbatimEvidence,
+    modalityPreserved: answerResult.modalityPreserved,
   };
 }

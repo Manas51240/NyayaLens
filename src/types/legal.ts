@@ -116,6 +116,11 @@ export interface AskDocumentResponse {
   missingInformationNotice?: string;
   suggestedFollowUpQuestions: string[];
   safetyDisclaimer: string;
+  confidence?: number;
+  answerType?: 'direct_answer' | 'not_found' | 'ambiguous' | 'legal_advice_boundary';
+  limitations?: string;
+  isVerbatimEvidence?: boolean;
+  modalityPreserved?: boolean;
 }
 
 export type ReviewPriority = 'high' | 'medium' | 'low' | 'neutral';

@@ -14,8 +14,9 @@ import {
 import { askDocumentQuestion, analyzeLegalDocument } from '../src/lib/grounded-ai-engine';
 import { SAMPLE_DOCUMENTS } from '../src/lib/sample-documents';
 
+const sampleNda = SAMPLE_DOCUMENTS[3]; // Standard Mutual Non-Disclosure Agreement
+
 describe('GenAI Grounding & Hallucination Resistance', () => {
-  const sampleNda = SAMPLE_DOCUMENTS[3]; // Standard Mutual Non-Disclosure Agreement
 
   it('strictly returns "not found" with empty evidence when querying an absent clause', async () => {
     // The Mutual NDA contains no terms regarding liquidated damages or inventory delivery
@@ -177,4 +178,42 @@ describe('GenAI Structured Schemas Validation', () => {
       expect(risk.severity).toBeDefined();
     }
   });
+
+  describe('Adversarial Absent Information Benchmark', () => {
+    it('returns "not found" when asking for absent bonus percentage', async () => {
+      const res = await askDocumentQuestion(sampleNda, "What is the employee's annual bonus percentage?");
+      expect(res.notFoundInDocument).toBe(true);
+      expect(res.groundedEvidence).toHaveLength(0);
+      expect(res.answer.toLowerCase()).toContain('could not find');
+    });
+
+    it('returns "not found" when asking for absent governing municipal court', async () => {
+      const res = await askDocumentQuestion(sampleNda, 'What is the specific municipal courthouse and governing court?');
+      expect(res.notFoundInDocument).toBe(true);
+      expect(res.groundedEvidence).toHaveLength(0);
+      expect(res.answer.toLowerCase()).toContain('could not find');
+    });
+
+    it('returns "not found" when asking for absent exact penalty amount', async () => {
+      const res = await askDocumentQuestion(sampleNda, 'What is the exact penalty amount in dollars?');
+      expect(res.notFoundInDocument).toBe(true);
+      expect(res.groundedEvidence).toHaveLength(0);
+      expect(res.answer.toLowerCase()).toContain('could not find');
+    });
+
+    it('returns "not found" when asking for absent CEO name', async () => {
+      const res = await askDocumentQuestion(sampleNda, "What is the CEO's name?");
+      expect(res.notFoundInDocument).toBe(true);
+      expect(res.groundedEvidence).toHaveLength(0);
+      expect(res.answer.toLowerCase()).toContain('could not find');
+    });
+
+    it('returns "not found" when asking for absent renewal fee', async () => {
+      const res = await askDocumentQuestion(sampleNda, 'What is the renewal fee?');
+      expect(res.notFoundInDocument).toBe(true);
+      expect(res.groundedEvidence).toHaveLength(0);
+      expect(res.answer.toLowerCase()).toContain('could not find');
+    });
+  });
 });
+

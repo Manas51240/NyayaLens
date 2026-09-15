@@ -50,4 +50,8 @@ export interface GroundedQAResponse extends AskDocumentResponse {
   retrieval: RetrievalResult;
   confidence: number;
   safetyValidation: SafetyValidationResult;
+  answerType?: 'direct_answer' | 'not_found' | 'ambiguous' | 'legal_advice_boundary';
+  limitations?: string;
+  isVerbatimEvidence?: boolean;
+  modalityPreserved?: boolean;
 }

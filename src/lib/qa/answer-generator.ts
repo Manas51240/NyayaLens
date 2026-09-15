@@ -1,18 +1,88 @@
 import { LegalDocument } from '@/types/legal';
 import { IntentClassificationResult, RetrievalResult } from './types';
+import { synthesizeGeminiGroundedAnswer } from './gemini-synthesis';
 
 export interface GeneratedAnswerResult {
   answer: string;
   notFoundInDocument: boolean;
   missingInformationNotice?: string;
   suggestedFollowUpQuestions: string[];
+  evidenceOverride?: Array<{ section: string; quote: string; confidence: number }>;
+  answerType?: 'direct_answer' | 'not_found' | 'ambiguous' | 'legal_advice_boundary';
+  limitations?: string;
+  isVerbatimEvidence?: boolean;
+  modalityPreserved?: boolean;
+  confidenceOverride?: number;
 }
 
 /**
- * Generates grounded answers exclusively based on retrieved document evidence.
- * Explicitly states when evidence is insufficient.
+ * Generates an evidence-grounded answer using Gemini 2.5 Flash when available,
+ * with automatic deterministic fallback.
  */
-export function generateGroundedAnswer(
+export async function generateGroundedAnswerAsync(
+  document: LegalDocument,
+  question: string,
+  intentResult: IntentClassificationResult,
+  retrievalResult: RetrievalResult
+): Promise<GeneratedAnswerResult> {
+  // Case 1: Adversarial Injection detected (handled deterministically immediately)
+  if (intentResult.intent === 'ADVERSARIAL_INJECTION') {
+    return generateDeterministicGroundedAnswer(document, question, intentResult, retrievalResult);
+  }
+
+  // Case 2: Insufficient or Absent Evidence (handled deterministically to prevent hallucination)
+  if (!retrievalResult.hasSufficientEvidence || retrievalResult.evidenceItems.length === 0) {
+    return generateDeterministicGroundedAnswer(document, question, intentResult, retrievalResult);
+  }
+
+  // Case 3: Attempt Gemini 2.5 Flash Grounded Synthesis
+  try {
+    const geminiResult = await synthesizeGeminiGroundedAnswer({
+      question,
+      documentTitle: document.title,
+      documentType: document.documentType || 'Legal Agreement',
+      rawText: document.rawText,
+      intentResult,
+      retrievalResult,
+    });
+
+    if (geminiResult) {
+      const evidenceOverride = geminiResult.evidence.map((e) => ({
+        section: e.section,
+        quote: e.quote,
+        confidence: geminiResult.confidence,
+      }));
+
+      return {
+        answer: geminiResult.answer,
+        notFoundInDocument: geminiResult.notFound,
+        missingInformationNotice: geminiResult.limitations,
+        suggestedFollowUpQuestions: geminiResult.suggestedFollowUpQuestions.length > 0
+          ? geminiResult.suggestedFollowUpQuestions
+          : [
+              'Would you like me to identify potential counter-proposals for this clause?',
+              'Should we formulate targeted questions on this for your attorney?',
+            ],
+        evidenceOverride: evidenceOverride.length > 0 ? evidenceOverride : undefined,
+        answerType: geminiResult.answerType,
+        limitations: geminiResult.limitations,
+        isVerbatimEvidence: geminiResult.evidence.every((e) => e.isVerbatim),
+        modalityPreserved: geminiResult.modalityPreserved,
+        confidenceOverride: geminiResult.confidence,
+      };
+    }
+  } catch {
+    // If Gemini call fails, seamlessly continue to deterministic fallback
+  }
+
+  // Case 4: Deterministic Fallback
+  return generateDeterministicGroundedAnswer(document, question, intentResult, retrievalResult);
+}
+
+/**
+ * Deterministic evidence-grounded answer generator (offline / fallback mode).
+ */
+export function generateDeterministicGroundedAnswer(
   document: LegalDocument,
   question: string,
   intentResult: IntentClassificationResult,
@@ -81,3 +151,5 @@ export function generateGroundedAnswer(
     suggestedFollowUpQuestions,
   };
 }
+
+export const generateGroundedAnswer = generateDeterministicGroundedAnswer;

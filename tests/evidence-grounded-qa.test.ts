@@ -121,4 +121,39 @@ Tenant agrees to pay Base Rent of $5,000 per month.
     expect(validatedAnswer).not.toContain('this contract is 100% legal');
     expect(safetyValidation.violationsBlocked.length).toBeGreaterThan(0);
   });
+
+  it('Structured Output Schema: validates compliant Gemini synthesis payload', async () => {
+    const { GroundedQASynthesisSchema } = await import('../src/lib/qa/gemini-synthesis');
+
+    const validPayload = {
+      answer: 'Executive base salary is $210,000 annually payable in accordance with payroll practices.',
+      answerType: 'direct_answer',
+      evidence: [
+        {
+          section: 'Section 3.1 Base Compensation',
+          quote: 'Company shall pay Executive a base salary of $210,000 per year',
+          relevance: 'Explicitly establishes annual base compensation figure',
+        },
+      ],
+      notFound: false,
+      confidence: 96,
+      suggestedFollowUpQuestions: ['Are there annual cost-of-living adjustments?'],
+    };
+
+    const parsed = GroundedQASynthesisSchema.safeParse(validPayload);
+    expect(parsed.success).toBe(true);
+  });
+
+  it('Structured Output Schema: rejects malformed Gemini payload missing required fields', async () => {
+    const { GroundedQASynthesisSchema } = await import('../src/lib/qa/gemini-synthesis');
+
+    const malformedPayload = {
+      answer: 'Just some ungrounded chat text',
+      // missing answerType, evidence, confidence, notFound
+    };
+
+    const parsed = GroundedQASynthesisSchema.safeParse(malformedPayload);
+    expect(parsed.success).toBe(false);
+  });
 });
+

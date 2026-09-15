@@ -389,7 +389,7 @@ describe('NYAYALENS Comprehensive Security Audit Suite', () => {
   describe('Domain 10: HTTP Security Headers Configuration', () => {
     it('verifies next.config.mjs exports strict security headers', async () => {
       expect(nextConfig.headers).toBeDefined();
-      const headerConfigs = await nextConfig.headers();
+      const headerConfigs = nextConfig.headers ? await nextConfig.headers() : [];
       expect(headerConfigs.length).toBeGreaterThan(0);
 
       const rootHeaders = headerConfigs[0].headers;

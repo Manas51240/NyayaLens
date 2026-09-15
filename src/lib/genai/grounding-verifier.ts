@@ -2,6 +2,7 @@ import { AbsenceRecord } from './schemas';
 
 export interface GroundingVerificationResult {
   isGrounded: boolean;
+  isVerbatim?: boolean;
   matchRatio: number;
   reason?: string;
   matchedExcerpt?: string;
@@ -21,11 +22,13 @@ function cleanForMatching(str: string): string {
 /**
  * Verifies whether a candidate quote is genuinely grounded in the raw document text.
  * Prevents hallucinated or fabricated evidence.
+ * Strictly separates exact verbatim quotes from ungrounded loose token overlap.
  */
 export function verifyQuoteGrounding(rawText: string, quote: string): GroundingVerificationResult {
   if (!quote || quote.trim().length === 0) {
     return {
       isGrounded: false,
+      isVerbatim: false,
       matchRatio: 0,
       reason: 'Quote is empty or missing.',
     };
@@ -34,6 +37,7 @@ export function verifyQuoteGrounding(rawText: string, quote: string): GroundingV
   if (!rawText || rawText.trim().length === 0) {
     return {
       isGrounded: false,
+      isVerbatim: false,
       matchRatio: 0,
       reason: 'Document text is empty.',
     };
@@ -41,70 +45,82 @@ export function verifyQuoteGrounding(rawText: string, quote: string): GroundingV
 
   const cleanQuote = quote.trim();
 
-  // 1. Direct exact substring match (highest fidelity)
+  // 1. Direct exact substring match (highest fidelity verbatim)
   if (rawText.includes(cleanQuote)) {
     return {
       isGrounded: true,
+      isVerbatim: true,
       matchRatio: 1.0,
       matchedExcerpt: cleanQuote,
     };
   }
 
-  // 2. Whitespace-normalized substring match
+  // 2. Whitespace-normalized substring match (verbatim with whitespace tolerance)
   const normalizedRaw = rawText.replace(/\s+/g, ' ');
   const normalizedQuote = cleanQuote.replace(/\s+/g, ' ');
 
   if (normalizedRaw.includes(normalizedQuote)) {
     return {
       isGrounded: true,
+      isVerbatim: true,
       matchRatio: 0.98,
       matchedExcerpt: cleanQuote,
     };
   }
 
-  // 3. Punctuation-agnostic search
+  // 3. Punctuation-agnostic search (verbatim with harmless punctuation difference)
   const cleanRawWords = cleanForMatching(rawText);
   const cleanQuoteWords = cleanForMatching(cleanQuote);
 
   if (cleanRawWords.includes(cleanQuoteWords)) {
     return {
       isGrounded: true,
-      matchRatio: 0.92,
+      isVerbatim: true,
+      matchRatio: 0.95,
       matchedExcerpt: cleanQuote,
     };
   }
 
-  // 4. Token N-Gram overlap check (for quotes with slight OCR or formatting differences)
-  const quoteTokens = cleanQuoteWords.split(' ').filter((w) => w.length > 2);
-  if (quoteTokens.length === 0) {
+  // 4. Contiguous multi-word sequence match (for quotes with ellipsis or minor OCR artifacts)
+  const quoteTokens = cleanQuoteWords.split(' ').filter((w) => w.length > 1);
+  if (quoteTokens.length < 3) {
     return {
       isGrounded: false,
+      isVerbatim: false,
       matchRatio: 0,
-      reason: 'Quote contains no meaningful words for verification.',
+      reason: 'Quote is too short for reliable grounded extraction without exact match.',
     };
   }
 
-  let matchedTokens = 0;
-  for (const token of quoteTokens) {
-    if (cleanRawWords.includes(token)) {
-      matchedTokens++;
+  // Check for contiguous sequence chunks (at least 4 consecutive words must appear together)
+  const chunkSize = Math.min(4, quoteTokens.length);
+  let contiguousHits = 0;
+  const totalChunks = quoteTokens.length - chunkSize + 1;
+
+  for (let i = 0; i < totalChunks; i++) {
+    const chunk = quoteTokens.slice(i, i + chunkSize).join(' ');
+    if (cleanRawWords.includes(chunk)) {
+      contiguousHits++;
     }
   }
 
-  const matchRatio = matchedTokens / quoteTokens.length;
+  const sequenceRatio = totalChunks > 0 ? contiguousHits / totalChunks : 0;
 
-  if (matchRatio >= 0.75) {
+  // Strict: loose unordered overlap is NOT accepted. Must have high contiguous sequence consistency.
+  if (sequenceRatio >= 0.70) {
     return {
       isGrounded: true,
-      matchRatio: Number(matchRatio.toFixed(2)),
+      isVerbatim: false, // Near-verbatim or OCR-varied, but not exact verbatim
+      matchRatio: Number(sequenceRatio.toFixed(2)),
       matchedExcerpt: cleanQuote,
     };
   }
 
   return {
     isGrounded: false,
-    matchRatio: Number(matchRatio.toFixed(2)),
-    reason: `Quote has insufficient grounding in document text (match ratio: ${(matchRatio * 100).toFixed(0)}% < 75% required).`,
+    isVerbatim: false,
+    matchRatio: Number(sequenceRatio.toFixed(2)),
+    reason: `Quote has insufficient grounding in document text (contiguous sequence match: ${(sequenceRatio * 100).toFixed(0)}% < 70% required). Loose token overlap is rejected.`,
   };
 }
 

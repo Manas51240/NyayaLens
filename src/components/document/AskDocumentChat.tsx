@@ -207,14 +207,40 @@ export const AskDocumentChat: React.FC<AskDocumentChatProps> = ({
                   : 'bg-slate-50 border border-slate-200 text-slate-800 rounded-bl-none shadow-2xs'
               }`}
             >
+              {msg.sender === 'assistant' && (
+                <div className="flex items-center gap-1.5 mb-2 pb-1.5 border-b border-slate-200/60 text-[10px] uppercase tracking-wider font-semibold">
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200/60">
+                    <Sparkles className="w-2.5 h-2.5" />
+                    AI Synthesis
+                  </span>
+                  {msg.responsePayload?.groundedEvidence && msg.responsePayload.groundedEvidence.length > 0 && (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+                      <ShieldCheck className="w-2.5 h-2.5" />
+                      Evidence Grounded
+                    </span>
+                  )}
+                  {msg.responsePayload?.notFoundInDocument && (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">
+                      <AlertCircle className="w-2.5 h-2.5" />
+                      Document Silence
+                    </span>
+                  )}
+                </div>
+              )}
+
               <div className="whitespace-pre-wrap">{msg.text}</div>
 
               {/* Grounded Evidence Citation Box */}
               {msg.responsePayload?.groundedEvidence && msg.responsePayload.groundedEvidence.length > 0 && (
                 <div className="mt-3 pt-3 border-t border-slate-200 space-y-2">
-                  <div className="flex items-center gap-1 text-[11px] font-semibold text-slate-600 uppercase tracking-wide">
-                    <Quote className="w-3 h-3 text-slate-500" />
-                    <span>Retrieved Document Evidence:</span>
+                  <div className="flex items-center justify-between text-[11px] font-semibold text-slate-700 uppercase tracking-wide">
+                    <div className="flex items-center gap-1">
+                      <Quote className="w-3 h-3 text-slate-500" />
+                      <span>Document Evidence (Verbatim Excerpt):</span>
+                    </div>
+                    <span className="text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 font-normal">
+                      Verified Contiguous Quote
+                    </span>
                   </div>
                   {msg.responsePayload.groundedEvidence.map((ev, i) => (
                     <div
@@ -231,9 +257,9 @@ export const AskDocumentChat: React.FC<AskDocumentChatProps> = ({
                         "{ev.quote}"
                       </blockquote>
                       <div className="flex items-center justify-between text-[10px] text-slate-500 font-sans mt-1.5">
-                        <span className="font-semibold text-slate-700">Source: {ev.section}</span>
+                        <span className="font-semibold text-slate-700">Source Section: {ev.section}</span>
                         <div className="flex items-center gap-1">
-                          <span>Confidence: {ev.confidence}%</span>
+                          <span>Grounding Support: {ev.confidence}%</span>
                           {onInspectCitation && (
                             <ExternalLink className="w-3 h-3 text-slate-400 group-hover:text-amber-600 transition-colors" />
                           )}
@@ -249,7 +275,7 @@ export const AskDocumentChat: React.FC<AskDocumentChatProps> = ({
                 <div className="mt-3 p-2.5 rounded bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-start gap-2">
                   <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                   <div>
-                    <strong className="block font-semibold">Absence Notice:</strong>
+                    <strong className="block font-semibold">Missing Information / Silence Notice:</strong>
                     <span>{msg.responsePayload.missingInformationNotice}</span>
                   </div>
                 </div>
@@ -321,17 +347,19 @@ export const AskDocumentChat: React.FC<AskDocumentChatProps> = ({
       >
         <input
           type="text"
+          id="document-question-input"
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           placeholder="Ask a question about this document (e.g. 'What are the termination penalties?')..."
-          className="flex-1 text-xs sm:text-sm px-3.5 py-2.5 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 placeholder:text-slate-400"
+          className="flex-1 min-h-[44px] text-xs sm:text-sm px-3.5 py-2.5 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 placeholder:text-slate-400"
           disabled={loading}
           aria-label="Ask a question about this document"
         />
         <button
           type="submit"
           disabled={loading || !question.trim()}
-          className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-slate-900 text-white rounded-md hover:bg-slate-800 disabled:opacity-50 text-xs sm:text-sm font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-900"
+          className="inline-flex items-center justify-center gap-1.5 min-h-[44px] min-w-[44px] px-4 py-2.5 bg-slate-900 text-white rounded-md hover:bg-slate-800 disabled:opacity-50 text-xs sm:text-sm font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-900"
+          aria-label="Submit document inquiry"
         >
           <Send className="w-4 h-4" />
           <span className="hidden sm:inline">Ask</span>
