@@ -1,4 +1,4 @@
-import { validateUploadedFile } from './validator';
+import { validateUploadedFile, sanitizeFileName, MAX_RAW_TEXT_LENGTH } from './validator';
 import { extractDocumentText } from './extractors';
 import { normalizeText, isolateUntrustedContent } from './normalizer';
 import { detectSections } from './section-detector';
@@ -97,6 +97,14 @@ export function ingestRawText(options: IngestRawTextOptions): IngestionResult {
     throw new IngestionError('EMPTY_FILE', 'Document text cannot be empty.', 400);
   }
 
+  if (rawText.length > MAX_RAW_TEXT_LENGTH) {
+    throw new IngestionError(
+      'FILE_TOO_LARGE',
+      `Document text exceeds the maximum allowed size of ${(MAX_RAW_TEXT_LENGTH / (1024 * 1024)).toFixed(0)} MB.`,
+      413
+    );
+  }
+
   const normalized = normalizeText(rawText);
   if (normalized.trim().length < 20) {
     throw new IngestionError(
@@ -106,7 +114,7 @@ export function ingestRawText(options: IngestRawTextOptions): IngestionResult {
     );
   }
 
-  const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const sanitizedFileName = sanitizeFileName(fileName);
   const fileSize = Buffer.byteLength(rawText, 'utf-8');
 
   const { processedText, security } = isolateUntrustedContent(normalized, enablePiiPreRedaction);

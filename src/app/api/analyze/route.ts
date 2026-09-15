@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ingestDocument, ingestRawText, IngestionError, IngestionResult } from '@/lib/ingestion';
 import { analyzeLegalDocument } from '@/lib/grounded-ai-engine';
+import { safeLogError, getSafeErrorMessage } from '@/lib/security/error-sanitizer';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -42,6 +43,14 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(
           { success: false, error: 'Document text cannot be empty.', errorCode: 'EMPTY_FILE' },
           { status: 400 }
+        );
+      }
+
+      // Enforce 5MB limit on raw text in JSON payload to protect against memory exhaustion
+      if (body.rawText.length > 5 * 1024 * 1024) {
+        return NextResponse.json(
+          { success: false, error: 'Document text exceeds maximum allowed size of 5 MB.', errorCode: 'FILE_TOO_LARGE' },
+          { status: 413 }
         );
       }
 
@@ -90,8 +99,8 @@ export async function POST(req: NextRequest) {
     }
 
     // Safe error message to avoid exposing system details, stack traces, or secrets
-    console.error('Document analysis route failure:', error);
-    const message = error instanceof Error ? error.message : 'An error occurred during document processing.';
+    safeLogError('Document analysis route failure', error);
+    const message = getSafeErrorMessage(error, 'An internal error occurred during document processing.');
     return NextResponse.json(
       { success: false, error: message, errorCode: 'EXTRACTION_FAILED' },
       { status: 500 }

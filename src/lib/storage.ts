@@ -1,5 +1,6 @@
 import { LegalDocument } from '@/types/legal';
 import { SAMPLE_DOCUMENTS } from './sample-documents';
+import { safeLogError } from './security/error-sanitizer';
 
 const STORAGE_KEY = 'nyayalens_documents_v1';
 const PRIVACY_KEY = 'nyayalens_privacy_settings_v1';
@@ -34,19 +35,29 @@ export function getStoredDocuments(): LegalDocument[] {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(SAMPLE_DOCUMENTS));
       return SAMPLE_DOCUMENTS;
     }
-    return parsed;
+    // Validate that items conform to minimal LegalDocument structure to guard against storage poisoning
+    const validDocs = parsed.filter(
+      (item) => item && typeof item === 'object' && typeof item.id === 'string' && typeof item.title === 'string'
+    );
+    if (validDocs.length === 0) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(SAMPLE_DOCUMENTS));
+      return SAMPLE_DOCUMENTS;
+    }
+    return validDocs;
   } catch {
     return SAMPLE_DOCUMENTS;
   }
 }
 
 export function getStoredDocumentById(id: string): LegalDocument | undefined {
+  if (!id || typeof id !== 'string') return undefined;
   const docs = getStoredDocuments();
   return docs.find((d) => d.id === id);
 }
 
 export function saveStoredDocument(document: LegalDocument): void {
   if (typeof window === 'undefined') return;
+  if (!document || typeof document !== 'object' || !document.id || !document.title) return;
   try {
     const docs = getStoredDocuments();
     const existingIndex = docs.findIndex((d) => d.id === document.id);
@@ -59,7 +70,11 @@ export function saveStoredDocument(document: LegalDocument): void {
     }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
   } catch (err) {
-    console.error('Failed to persist document to storage:', err);
+    if (err instanceof DOMException && (err.name === 'QuotaExceededError' || err.code === 22)) {
+      console.warn('[STORAGE] Local storage quota exceeded. Clear stored documents to free space.');
+    } else {
+      safeLogError('Failed to persist document to storage', err);
+    }
   }
 }
 

@@ -10,6 +10,7 @@ import {
   createAbsenceNotice,
 } from './grounding-verifier';
 import { wrapUntrustedDocumentText, detectPromptInjectionAttempts } from '../sanitizer';
+import { safeLogError } from '../security/error-sanitizer';
 
 const LEGAL_DISCLAIMER_NOTICE =
   'Notice: NyayaLens is an AI-powered legal document understanding platform designed for educational and informational assistance. It does not provide legal advice, legal opinions, or replace a licensed attorney. Review severity levels indicate AI-identified review priority, not legal enforceability.';
@@ -153,7 +154,7 @@ Ensure EVERY clause has verbatim originalText. Ensure EVERY risk has a verbatim 
       },
     };
   } catch (error) {
-    console.error('Structured GenAI analysis error:', error);
+    safeLogError('Structured GenAI analysis error', error);
     return enforceGroundingOnAnalysis(fallbackAnalysis, rawText);
   }
 }

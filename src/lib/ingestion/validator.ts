@@ -1,6 +1,7 @@
 import { SupportedFormat, FileValidationResult, IngestionError, IngestionErrorCode } from './types';
 
 export const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
+export const MAX_RAW_TEXT_LENGTH = 5 * 1024 * 1024; // 5 million chars (~5MB text)
 export const ALLOWED_EXTENSIONS: readonly string[] = ['.pdf', '.docx', '.txt', '.md'] as const;
 
 /**
@@ -22,6 +23,13 @@ export function sanitizeFileName(fileName: string): string {
 
   // Allow only alphanumeric, spaces, underscores, dashes, and periods
   clean = clean.replace(/[^a-zA-Z0-9\s._-]/g, '_').trim();
+
+  // Neutralize Windows reserved device names (CON, PRN, AUX, NUL, COM1-9, LPT1-9)
+  const baseNameWithoutExt = clean.replace(/\.[^.]+$/, '').toUpperCase();
+  const WINDOWS_RESERVED = /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/i;
+  if (WINDOWS_RESERVED.test(baseNameWithoutExt)) {
+    clean = `safe_${clean}`;
+  }
 
   if (!clean || clean === '.') {
     return 'document_upload.txt';

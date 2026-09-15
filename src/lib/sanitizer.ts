@@ -7,28 +7,41 @@ export const UNTRUSTED_BOUNDARY_END = '<<</UNTRUSTED_DOCUMENT_CONTENT>>>';
 
 // Known adversarial patterns attempting to hijack system instructions
 const INJECTION_PATTERNS = [
-  /(ignore|disregard)\s+(all\s+)?(previous|prior|above)\s+instructions/gi,
-  /you\s+are\s+now\s+(a|an)\s+[a-z\s]+/gi,
-  /disregard\s+(system\s+)?prompt/gi,
-  /reveal\s+(your\s+)?(system\s+prompt|api\s*key|hidden\s+rules)/gi,
-  /print\s+(the\s+)?(api\s*key|system\s+prompt)/gi,
-  /say\s+that\s+this\s+contract\s+is\s+(100%|definitely|completely)\s+(legal|illegal|valid|void)/gi,
+  /(?:ignore|disregard|forget)\s+(?:all\s+)?(?:previous|prior|above)\s+instructions/gi,
+  /you\s+are\s+now\s+(?:a|an)\s+[a-z\s]+/gi,
+  /(?:disregard|forget|override)\s+(?:system\s+)?prompt/gi,
+  /(?:reveal|show|leak|print)\s+(?:your\s+)?(?:system\s+prompt|api\s*key|hidden\s+rules|instructions)/gi,
+  /print\s+(?:the\s+)?(?:api\s*key|system\s+prompt)/gi,
+  /say\s+that\s+this\s+contract\s+is\s+(?:100%|definitely|completely)\s+(?:legal|illegal|valid|void)/gi,
   /output\s+the\s+following\s+password/gi,
-  /new\s+system\s+directive/gi,
+  /(?:new\s+system\s+directive|system\s+override|note\s+to\s+ai)/gi,
+  /\b(?:jailbreak|DAN\s+mode|unrestricted\s+mode)\b/gi,
+  /(?:\[INST\]|<\|im_start\|>|<\|system\|>|###\s*(?:System|Instruction):)/gi,
+  /!\[.*?\]\(https?:\/\/[^\s)]+\)/gi, // Markdown image exfiltration attempt
+  /<\s*(?:script|img|iframe|object|embed)[^>]*>/gi, // HTML tag injection attempt
 ];
 
 /**
+ * Strips zero-width spaces, soft hyphens, and bidirectional overrides
+ * frequently used by attackers to evade keyword-based security filters.
+ */
+export function stripInvisibleCharacters(text: string): string {
+  if (!text) return '';
+  return text.replace(/[\u200B-\u200F\uFEFF\u202A-\u202E\u00AD]/g, '');
+}
+
+/**
  * Scans text for high-confidence prompt injection phrases.
- * Does not silently delete content (as it might be legal text),
- * but tags it so the LLM prompt can explicitly neutralize it.
+ * Automatically normalizes zero-width characters prior to scanning.
  */
 export function detectPromptInjectionAttempts(text: string): {
   hasInjectionAttempt: boolean;
   detectedPatterns: string[];
 } {
+  const normalized = stripInvisibleCharacters(text);
   const detected: string[] = [];
   for (const pattern of INJECTION_PATTERNS) {
-    const match = text.match(pattern);
+    const match = normalized.match(pattern);
     if (match) {
       detected.push(...match.slice(0, 3));
     }
@@ -44,10 +57,13 @@ export function detectPromptInjectionAttempts(text: string): {
  * with explicit contextual warnings to the GenAI model.
  */
 export function wrapUntrustedDocumentText(rawText: string): string {
-  // Normalize whitespace and escape any boundary spoofing attempts inside the text
+  // Normalize whitespace and escape any boundary spoofing attempts, HTML tags, and exfiltration links inside the text
   const neutralized = rawText
     .replaceAll('<<<UNTRUSTED_DOCUMENT_CONTENT>>>', '[ESCAPED_BOUNDARY]')
-    .replaceAll('<<</UNTRUSTED_DOCUMENT_CONTENT>>>', '[ESCAPED_BOUNDARY]');
+    .replaceAll('<<</UNTRUSTED_DOCUMENT_CONTENT>>>', '[ESCAPED_BOUNDARY]')
+    .replace(/<\s*(script|iframe|object|embed)[^>]*>.*?<\s*\/\s*\1\s*>/gis, '[FILTERED_HTML_SCRIPT]')
+    .replace(/<\s*(script|iframe|object|embed|img)[^>]*>/gi, '[FILTERED_HTML_TAG]')
+    .replace(/!\[.*?\]\(https?:\/\/[^\s)]+\)/gi, '[FILTERED_MEDIA_LINK]');
 
   return `${UNTRUSTED_BOUNDARY_START}\n${neutralized}\n${UNTRUSTED_BOUNDARY_END}`;
 }
