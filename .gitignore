@@ -43,3 +43,5 @@ next-env.d.ts
 !public/**/*.svg
 !public/**/*.png
 !public/**/*.ico
+
+.vercel
