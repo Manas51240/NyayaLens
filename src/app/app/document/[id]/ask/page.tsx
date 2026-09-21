@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { MessageSquareText, ArrowLeft, ShieldCheck } from 'lucide-react';
-import { getStoredDocumentById } from '@/lib/storage';
+import { getStoredDocumentById, saveStoredDocument } from '@/lib/storage';
 import { LegalDocument } from '@/types/legal';
 import { AppShell } from '@/components/layout/AppShell';
 import { DocumentNavTabs } from '@/components/document/DocumentNavTabs';
@@ -25,7 +25,24 @@ export default function DocumentAskPage() {
       const found = getStoredDocumentById(id);
       if (found) {
         setDoc(found);
+        setLoading(false);
+        return;
       }
+
+      // Try fetching from server session storage
+      fetch(`/api/documents/${id}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success && data.document) {
+            setDoc(data.document);
+            saveStoredDocument(data.document);
+          }
+        })
+        .catch(() => {})
+        .finally(() => {
+          setLoading(false);
+        });
+      return;
     }
     setLoading(false);
   }, [id]);
@@ -50,7 +67,7 @@ export default function DocumentAskPage() {
     );
   }
 
-  const highRisks = doc.risks.filter((r) => r.severity === 'high');
+  const highRisks = (doc.risks || []).filter((r) => r.severity === 'high');
 
   return (
     <AppShell

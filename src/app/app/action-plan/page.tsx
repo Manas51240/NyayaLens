@@ -54,16 +54,44 @@ function ActionPlanContent() {
   useEffect(() => {
     const docs = getStoredDocuments();
     setDocuments(docs);
-    let targetDocId = '';
-    if (docIdParam && docs.some((d) => d.id === docIdParam)) {
-      targetDocId = docIdParam;
-    } else if (docs.length > 0) {
-      targetDocId = docs[0].id;
-    }
-    setSelectedDocId(targetDocId);
 
-    if (targetDocId) {
-      loadDocState(targetDocId, docs);
+    if (docIdParam) {
+      const match = docs.find((d) => d.id === docIdParam);
+      if (match) {
+        setSelectedDocId(docIdParam);
+        loadDocState(docIdParam, docs);
+        setMounted(true);
+        return;
+      } else {
+        // Try fetching document from server session storage
+        fetch(`/api/documents/${docIdParam}`)
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.success && data.document) {
+              const updated = [data.document, ...docs.filter((d) => d.id !== data.document.id)];
+              setDocuments(updated);
+              saveStoredDocument(data.document);
+              setSelectedDocId(data.document.id);
+              loadDocState(data.document.id, updated);
+            } else if (docs.length > 0) {
+              setSelectedDocId(docs[0].id);
+              loadDocState(docs[0].id, docs);
+            }
+          })
+          .catch(() => {
+            if (docs.length > 0) {
+              setSelectedDocId(docs[0].id);
+              loadDocState(docs[0].id, docs);
+            }
+          })
+          .finally(() => {
+            setMounted(true);
+          });
+        return;
+      }
+    } else if (docs.length > 0) {
+      setSelectedDocId(docs[0].id);
+      loadDocState(docs[0].id, docs);
     }
     setMounted(true);
   }, [docIdParam]);

@@ -20,7 +20,7 @@ import {
   Search,
   ExternalLink
 } from 'lucide-react';
-import { getStoredDocumentById } from '@/lib/storage';
+import { getStoredDocumentById, saveStoredDocument } from '@/lib/storage';
 import { LegalDocument, ImportantClause } from '@/types/legal';
 import { AppShell } from '@/components/layout/AppShell';
 import { DocumentNavTabs } from '@/components/document/DocumentNavTabs';
@@ -43,7 +43,24 @@ export default function DocumentOverviewPage() {
       const found = getStoredDocumentById(id);
       if (found) {
         setDoc(found);
+        setLoading(false);
+        return;
       }
+
+      // Try fetching from server session storage
+      fetch(`/api/documents/${id}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success && data.document) {
+            setDoc(data.document);
+            saveStoredDocument(data.document);
+          }
+        })
+        .catch(() => {})
+        .finally(() => {
+          setLoading(false);
+        });
+      return;
     }
     setLoading(false);
   }, [id]);
@@ -66,7 +83,7 @@ export default function DocumentOverviewPage() {
     );
   }
 
-  const highRisks = doc.risks.filter((r) => r.severity === 'high');
+  const highRisks = (doc.risks || []).filter((r) => r.severity === 'high');
 
   return (
     <AppShell
@@ -106,7 +123,7 @@ export default function DocumentOverviewPage() {
                   className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-red-50 hover:bg-red-100 text-red-800 border border-red-200 text-xs font-semibold transition-colors"
                 >
                   <Radar className="w-3.5 h-3.5 text-red-600" />
-                  <span>Risk Radar ({doc.risks.length})</span>
+                  <span>Risk Radar ({doc.risks?.length || 0})</span>
                 </Link>
                 <Link
                   href={`/app/document/${doc.id}/ask`}
