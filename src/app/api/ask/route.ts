@@ -9,6 +9,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
+  const requestId = req.headers.get('x-request-id') || crypto.randomUUID();
   try {
     // 1. Rate Limiting Check (60 req/min per client)
     const rateLimit = checkRateLimit(req, { maxRequests: 60, windowMs: 60000 });
@@ -21,6 +22,7 @@ export async function POST(req: NextRequest) {
             'Retry-After': String(rateLimit.resetSeconds),
             'X-RateLimit-Limit': String(rateLimit.limit),
             'X-RateLimit-Remaining': '0',
+            'x-request-id': requestId,
           },
         }
       );
@@ -30,24 +32,30 @@ export async function POST(req: NextRequest) {
     const { document, question } = body as { document: LegalDocument; question: string };
 
     if (!question || typeof question !== 'string' || question.trim().length === 0) {
-      return NextResponse.json({ error: 'Please provide a valid question.' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Please provide a valid question.' },
+        { status: 400, headers: { 'x-request-id': requestId } }
+      );
     }
 
     if (question.length > 3000) {
       return NextResponse.json(
         { error: 'Question exceeds maximum allowed length of 3,000 characters.' },
-        { status: 400 }
+        { status: 400, headers: { 'x-request-id': requestId } }
       );
     }
 
     if (!document || !document.rawText || typeof document.rawText !== 'string') {
-      return NextResponse.json({ error: 'Document context is missing or invalid.' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Document context is missing or invalid.' },
+        { status: 400, headers: { 'x-request-id': requestId } }
+      );
     }
 
     if (document.rawText.length > 10 * 1024 * 1024) {
       return NextResponse.json(
         { error: 'Document content exceeds maximum allowed size of 10 MB.' },
-        { status: 400 }
+        { status: 400, headers: { 'x-request-id': requestId } }
       );
     }
 
@@ -62,12 +70,16 @@ export async function POST(req: NextRequest) {
         headers: {
           'X-RateLimit-Limit': String(rateLimit.limit),
           'X-RateLimit-Remaining': String(rateLimit.remaining),
+          'x-request-id': requestId,
         },
       }
     );
   } catch (error: unknown) {
-    safeLogError('Ask route failure', error);
+    safeLogError(`Ask route failure [req: ${requestId}]`, error);
     const message = getSafeErrorMessage(error, 'An internal error occurred during Q&A retrieval.');
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(
+      { error: message },
+      { status: 500, headers: { 'x-request-id': requestId } }
+    );
   }
 }

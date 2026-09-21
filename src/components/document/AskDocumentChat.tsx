@@ -247,9 +247,9 @@ export const AskDocumentChat: React.FC<AskDocumentChatProps> = ({
                     </span>
                   )}
                   {msg.responsePayload?.notFoundInDocument && (
-                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">
-                      <AlertCircle className="w-2.5 h-2.5" />
-                      Document Silence
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-300 font-bold">
+                      <AlertCircle className="w-2.5 h-2.5 text-amber-700" />
+                      Not Found in Document (Absence Confirmed)
                     </span>
                   )}
                 </div>

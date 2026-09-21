@@ -6,15 +6,17 @@ import { SupportedFormat, ExtractedDocument, IngestionError } from './types';
  */
 export async function extractPdf(buffer: Buffer): Promise<{ text: string; notes?: string[] }> {
   const notes: string[] = [];
+  let pageCount = 0;
 
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const pdfParse = require('pdf-parse');
     const data = await pdfParse(buffer);
     const text = data.text || '';
+    pageCount = data.numpages || 0;
 
-    if (data.numpages) {
-      notes.push(`Extracted ${data.numpages} pages.`);
+    if (pageCount > 0) {
+      notes.push(`Extracted ${pageCount} pages.`);
     }
 
     if (text.trim().length > 0) {
@@ -45,6 +47,14 @@ export async function extractPdf(buffer: Buffer): Promise<{ text: string; notes?
     return { text: fallbackText, notes };
   }
 
+  if (pageCount > 0) {
+    throw new IngestionError(
+      'SCANNED_DOCUMENT_OCR_REQUIRED',
+      `The uploaded PDF contains ${pageCount} page(s) but lacks a machine-readable text layer. It appears to be an image-only scan. Please run OCR (using Adobe Acrobat, Google Drive, or an OCR tool) to embed a selectable text layer before uploading.`,
+      422
+    );
+  }
+
   throw new IngestionError(
     'EXTRACTION_FAILED',
     'Failed to extract text from the PDF. The document may be an image-only scan or contains corrupted streams.',
@@ -60,6 +70,15 @@ export async function extractDocx(buffer: Buffer): Promise<{ text: string; notes
     const result = await mammoth.extractRawText({ buffer });
     const text = result.value || '';
     const notes: string[] = [];
+
+    // Guard against zip bomb decompression expansion
+    if (text.length > 5 * 1024 * 1024) {
+      throw new IngestionError(
+        'FILE_TOO_LARGE',
+        'Extracted DOCX text exceeds maximum permissible size of 5 MB (decompression threshold exceeded).',
+        413
+      );
+    }
 
     if (result.messages && result.messages.length > 0) {
       notes.push(...result.messages.map((m) => `${m.type}: ${m.message}`));

@@ -65,6 +65,9 @@ export interface ActionItem {
   category: string;
   suggestedQuestionsForLawyer: string[];
   documentsToGather?: string[];
+  responsibleParty?: string;
+  sourceClause?: string;
+  noticePeriod?: string;
   status?: 'pending' | 'in_progress' | 'completed';
 }
 

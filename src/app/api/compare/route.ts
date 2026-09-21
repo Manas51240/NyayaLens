@@ -9,6 +9,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
+  const requestId = req.headers.get('x-request-id') || crypto.randomUUID();
   try {
     // 1. Rate Limiting Check (30 comparisons/min per client)
     const rateLimit = checkRateLimit(req, { maxRequests: 30, windowMs: 60000 });
@@ -21,6 +22,7 @@ export async function POST(req: NextRequest) {
             'Retry-After': String(rateLimit.resetSeconds),
             'X-RateLimit-Limit': String(rateLimit.limit),
             'X-RateLimit-Remaining': '0',
+            'x-request-id': requestId,
           },
         }
       );
@@ -30,7 +32,10 @@ export async function POST(req: NextRequest) {
     const { docA, docB } = body as { docA: LegalDocument; docB: LegalDocument };
 
     if (!docA || !docB || typeof docA !== 'object' || typeof docB !== 'object') {
-      return NextResponse.json({ error: 'Both Document A and Document B are required for comparison.' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Both Document A and Document B are required for comparison.' },
+        { status: 400, headers: { 'x-request-id': requestId } }
+      );
     }
 
     if (
@@ -39,7 +44,7 @@ export async function POST(req: NextRequest) {
     ) {
       return NextResponse.json(
         { error: 'Document content exceeds maximum allowed size of 10 MB for comparison.' },
-        { status: 400 }
+        { status: 400, headers: { 'x-request-id': requestId } }
       );
     }
 
@@ -54,12 +59,16 @@ export async function POST(req: NextRequest) {
         headers: {
           'X-RateLimit-Limit': String(rateLimit.limit),
           'X-RateLimit-Remaining': String(rateLimit.remaining),
+          'x-request-id': requestId,
         },
       }
     );
   } catch (error: unknown) {
-    safeLogError('Comparison route failure', error);
+    safeLogError(`Comparison route failure [req: ${requestId}]`, error);
     const message = getSafeErrorMessage(error, 'An internal error occurred during document comparison.');
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(
+      { error: message },
+      { status: 500, headers: { 'x-request-id': requestId } }
+    );
   }
 }

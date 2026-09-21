@@ -5,15 +5,27 @@ export const MAX_RAW_TEXT_LENGTH = 5 * 1024 * 1024; // 5 million chars (~5MB tex
 export const ALLOWED_EXTENSIONS: readonly string[] = ['.pdf', '.docx', '.txt', '.md'] as const;
 
 /**
- * Sanitizes a filename to protect against path traversal and dangerous characters.
+ * Strips dangerous bidirectional overrides (LRO, RLO, LRE, RLE, etc.) and hidden/zero-width unicode characters.
+ */
+export function stripBidiAndHiddenChars(input: string): string {
+  if (!input || typeof input !== 'string') return '';
+  // U+200B-U+200D (zero width chars), U+FEFF (BOM/zero-width no-break), U+202A-U+202E (bidi overrides), U+2066-U+2069 (directional isolates)
+  return input.replace(/[\u200B-\u200D\uFEFF\u202A-\u202E\u2066-\u2069]/g, '');
+}
+
+/**
+ * Sanitizes a filename to protect against path traversal, bidi overrides, and dangerous characters.
  */
 export function sanitizeFileName(fileName: string): string {
   if (!fileName || typeof fileName !== 'string') {
     return 'document_upload.txt';
   }
 
+  // Strip bidi characters and hidden unicode first
+  let clean = stripBidiAndHiddenChars(fileName);
+
   // Strip null bytes and control characters
-  let clean = fileName.replace(/[\x00-\x1F\x7F]/g, '');
+  clean = clean.replace(/[\x00-\x1F\x7F]/g, '');
 
   // Extract basename to eliminate path traversal attempts (e.g., ../../etc/passwd)
   clean = clean.replace(/^.*[\\/]/, '');

@@ -69,6 +69,15 @@ export function saveStoredDocument(document: LegalDocument): void {
       updated = [document, ...docs];
     }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+
+    // Asynchronously synchronize with session-isolated server storage
+    fetch('/api/documents', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ document }),
+    }).catch(() => {
+      // Background sync failure gracefully handled; client-side storage remains intact
+    });
   } catch (err) {
     if (err instanceof DOMException && (err.name === 'QuotaExceededError' || err.code === 22)) {
       console.warn('[STORAGE] Local storage quota exceeded. Clear stored documents to free space.');
@@ -84,6 +93,9 @@ export function deleteStoredDocument(id: string): boolean {
     const docs = getStoredDocuments();
     const filtered = docs.filter((d) => d.id !== id);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
+
+    // Asynchronously delete from server storage
+    fetch(`/api/documents/${id}`, { method: 'DELETE' }).catch(() => {});
     return true;
   } catch {
     return false;

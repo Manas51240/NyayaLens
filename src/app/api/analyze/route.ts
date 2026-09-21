@@ -9,6 +9,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
+  const requestId = req.headers.get('x-request-id') || crypto.randomUUID();
   try {
     // 1. Rate Limiting Check (30 doc analyses/min per client)
     const rateLimit = checkRateLimit(req, { maxRequests: 30, windowMs: 60000 });
@@ -21,6 +22,7 @@ export async function POST(req: NextRequest) {
             'Retry-After': String(rateLimit.resetSeconds),
             'X-RateLimit-Limit': String(rateLimit.limit),
             'X-RateLimit-Remaining': '0',
+            'x-request-id': requestId,
           },
         }
       );
@@ -112,6 +114,7 @@ export async function POST(req: NextRequest) {
         headers: {
           'X-RateLimit-Limit': String(rateLimit.limit),
           'X-RateLimit-Remaining': String(rateLimit.remaining),
+          'x-request-id': requestId,
         },
       }
     );
@@ -123,16 +126,22 @@ export async function POST(req: NextRequest) {
           error: error.message,
           errorCode: error.code,
         },
-        { status: error.httpStatus }
+        {
+          status: error.httpStatus,
+          headers: { 'x-request-id': requestId },
+        }
       );
     }
 
     // Safe error message to avoid exposing system details, stack traces, or secrets
-    safeLogError('Document analysis route failure', error);
+    safeLogError(`Document analysis route failure [req: ${requestId}]`, error);
     const message = getSafeErrorMessage(error, 'An internal error occurred during document processing.');
     return NextResponse.json(
       { success: false, error: message, errorCode: 'EXTRACTION_FAILED' },
-      { status: 500 }
+      {
+        status: 500,
+        headers: { 'x-request-id': requestId },
+      }
     );
   }
 }

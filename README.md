@@ -7,7 +7,7 @@
 [![Next.js](https://img.shields.io/badge/Next.js-15.5.25-black?style=flat&logo=next.js)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue?style=flat&logo=typescript)](https://www.typescriptlang.org/)
 [![Tailwind CSS](https://img.shields.io/badge/TailwindCSS-3.4-38bdf8?style=flat&logo=tailwind-css)](https://tailwindcss.com/)
-[![Tests](https://img.shields.io/badge/Vitest-127%20Passed%20(12%20Suites)-emerald)](https://vitest.dev/)
+[![Tests](https://img.shields.io/badge/Vitest-149%20Passed%20(15%20Suites)-emerald)](https://vitest.dev/)
 [![Accessibility](https://img.shields.io/badge/Accessibility-WCAG%202.1%20AA%20Oriented-success)](#accessibility)
 
 ---
@@ -83,9 +83,11 @@ Legal agreements govern the most consequential relationships in modern life—em
       ├──> Next.js App Router (15.5.25) / TypeScript / Tailwind CSS
       │
       ├──> [ Server-Side Secure API Routes ] (No browser API key leaks)
-      │       ├── /api/analyze  --> Input Sanitizer & Extraction Engine
-      │       ├── /api/ask      --> Grounded Semantic Retrieval & Q&A
-      │       └── /api/compare  --> Multi-Dimensional Contract Delta Engine
+      │       ├── /api/analyze    --> Input Sanitizer & Extraction Engine
+      │       ├── /api/ask        --> Grounded Semantic Retrieval & Q&A
+      │       ├── /api/compare    --> Multi-Dimensional Contract Delta Engine
+      │       ├── /api/health     --> Production Health Diagnostics & Uptime
+      │       └── /api/documents  --> Session-Isolated Document & Action Plan CRUD
       │
       ├──> [ Untrusted Input Isolation Shield ]
       │       ├── Delimiter Wrapping: <<<UNTRUSTED_DOCUMENT_CONTENT>>>
@@ -143,7 +145,7 @@ NyayaLens features a WCAG 2.1 AA–oriented accessibility implementation designe
 
 ## Testing & Verification
 
-NyayaLens includes a comprehensive Vitest test suite (`tests/`) containing **127 automated tests across 12 test suites**:
+NyayaLens includes a comprehensive Vitest test suite (`tests/`) containing **149 automated tests across 15 test suites**:
 1. `tests/performance-and-efficiency.test.ts`: Multi-query document indexing benchmarks, request deduplication, prompt caching, rate limiting, and cache isolation.
 2. `tests/modality-preservation.test.ts`: Contractual modality preservation guardian (shall, must, may, can, will, unless, subject to).
 3. `tests/evidence-grounded-qa.test.ts`: 8-stage Q&A pipeline, semantic retrieval, strict structured output schema validation, natural language query expansion.
@@ -156,6 +158,9 @@ NyayaLens includes a comprehensive Vitest test suite (`tests/`) containing **127
 10. `tests/ingestion-pipeline.test.ts`: Multi-stage document ingestion, magic byte checking, section detection, normalization.
 11. `tests/security-audit.test.ts`: 14-domain security audit (direct/indirect injection, zero-width evasion, markdown exfiltration, credentials redaction).
 12. `tests/api-routes.test.ts`: Next.js HTTP API route handlers (`/api/analyze`, `/api/ask`, `/api/compare`), payload limits, status codes.
+13. `tests/health-check.test.ts`: Production health check endpoint (`/api/health`), telemetry status, request ID propagation, zero secret leakage.
+14. `tests/session-isolation.test.ts`: HMAC-SHA256 session token cryptography, server-side document store, and cross-user IDOR defense (User A vs User B).
+15. `tests/ingestion-edge-cases.test.ts`: Scanned PDF text layer absence detection (`SCANNED_DOCUMENT_OCR_REQUIRED`), Unicode bidi override sanitization, and decompression bomb thresholds.
 
 To run the automated tests:
 ```bash
