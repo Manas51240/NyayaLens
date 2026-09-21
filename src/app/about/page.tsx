@@ -24,7 +24,7 @@ export default function AboutPage() {
           About NYAYALENS
         </h1>
         <p className="text-base sm:text-lg text-slate-600 leading-relaxed max-w-2xl">
-          "Understand your legal documents. Know what matters. Take the next safe step."
+          &ldquo;Understand your legal documents. Know what matters. Take the next safe step.&rdquo;
         </p>
       </div>
 
@@ -40,7 +40,7 @@ export default function AboutPage() {
         <div className="bg-white border border-slate-200 rounded-lg p-6 space-y-3 shadow-2xs">
           <h2 className="text-base font-bold text-slate-900">The Solution</h2>
           <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-            <strong>NyayaLens</strong> ("Nyaya" from Sanskrit for <em>Justice/Righteousness</em>, combined with <em>Lens</em> for clarity) transforms dense legal texts into plain-language summaries, calculates an objective 10-category Risk Radar, retrieves grounded clause evidence, and produces structured briefs for client-attorney consultations.
+            <strong>NyayaLens</strong> (&ldquo;Nyaya&rdquo; from Sanskrit for <em>Justice/Righteousness</em>, combined with <em>Lens</em> for clarity) transforms dense legal texts into plain-language summaries, calculates an objective 10-category Risk Radar, retrieves grounded clause evidence, and produces structured briefs for client-attorney consultations.
           </p>
         </div>
       </section>

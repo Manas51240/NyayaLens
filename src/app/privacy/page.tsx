@@ -80,7 +80,7 @@ export default function PrivacyPage() {
               Document Retention Mode
             </span>
             <p className="text-xs text-slate-500 leading-relaxed">
-              Choose whether analyzed documents remain in your browser's local sandbox or are discarded as soon as your browser session closes.
+              Choose whether analyzed documents remain in your browser&apos;s local sandbox or are discarded as soon as your browser session closes.
             </p>
           </div>
           <select

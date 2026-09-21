@@ -73,6 +73,23 @@
   animation: shimmer 1.5s infinite;
 }
 
+/* Accessible Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .skeleton-shimmer {
+    animation: none !important;
+    background: #f1f5f9 !important;
+  }
+}
+
 /* Print optimizations for Consultation Brief and Action Plan */
 @media print {
   header, footer, nav, button, .no-print, aside {

@@ -145,13 +145,13 @@ NyayaLens features a WCAG 2.1 AA–oriented accessibility implementation designe
 
 ## Testing & Verification
 
-NyayaLens includes a comprehensive Vitest test suite (`tests/`) containing **149 automated tests across 15 test suites**:
+NyayaLens includes a comprehensive Vitest test suite (`tests/`) containing **161 automated tests across 16 test suites**:
 1. `tests/performance-and-efficiency.test.ts`: Multi-query document indexing benchmarks, request deduplication, prompt caching, rate limiting, and cache isolation.
 2. `tests/modality-preservation.test.ts`: Contractual modality preservation guardian (shall, must, may, can, will, unless, subject to).
 3. `tests/evidence-grounded-qa.test.ts`: 8-stage Q&A pipeline, semantic retrieval, strict structured output schema validation, natural language query expansion.
 4. `tests/prompt-injection.test.ts`: Boundary break-out defense, adversarial query blocking, and client-side PII redaction.
 5. `tests/grounding-and-hallucination.test.ts`: Grounding integrity, quote fidelity, and citation verification.
-6. `tests/comparison.test.ts`: 9-dimension semantic comparison engine with neutral review priorities.
+6. `tests/comparison.test.ts`: 9-dimension semantic comparison engine with neutral review priorities and sub-millisecond scaling benchmarks (10, 50, 100, 250 clauses).
 7. `tests/safety-disclaimers.test.ts`: Legal disclaimer attachment and outcome certainty reframing.
 8. `tests/hallucination-resistance.test.ts`: Absence detection, quote verification, unsupported claim rejection.
 9. `tests/extraction-and-validation.test.ts`: PDF/DOCX format validation, 10MB file ceiling enforcement.
@@ -161,18 +161,25 @@ NyayaLens includes a comprehensive Vitest test suite (`tests/`) containing **149
 13. `tests/health-check.test.ts`: Production health check endpoint (`/api/health`), telemetry status, request ID propagation, zero secret leakage.
 14. `tests/session-isolation.test.ts`: HMAC-SHA256 session token cryptography, server-side document store, and cross-user IDOR defense (User A vs User B).
 15. `tests/ingestion-edge-cases.test.ts`: Scanned PDF text layer absence detection (`SCANNED_DOCUMENT_OCR_REQUIRED`), Unicode bidi override sanitization, and decompression bomb thresholds.
+16. `tests/e2e-user-journeys.test.ts`: End-to-end critical user journeys verifying document workflow, contract comparison, action plan lifecycle, consultation brief generation, multi-tenant session isolation, and accessibility reduced-motion & focus trapping.
 
-To run the automated tests:
+To run the unit and integration tests:
 ```bash
 npm test
+```
+
+To run Playwright browser end-to-end smoke tests:
+```bash
+npm run test:e2e
 ```
 
 ---
 
 ## Assumptions & Limitations
 
-- **Assumptions**: Documents are in English and contain machine-readable text (scanned image-only PDFs without OCR text layers require OCR pre-processing).
-- **Limitations**: NyayaLens cannot authenticate the signatures on a contract, verify the mental capacity of contracting parties, or provide local jurisdictional case law research outside general statutory awareness. It is an assistant for consultation preparation, not a digital lawyer.
+- **Language and Jurisdiction Focus**: NyayaLens is intentionally calibrated for English-language commercial and employment contracts governed under common-law principles (e.g., Delaware, New York, California, England & Wales, and India). Restricting legal analysis to English agreements is a deliberate legal safety control: cross-lingual translation of binding statutory terminology between disparate civil law and common law traditions (e.g., French Civil Code *force majeure* vs Anglo-American contractual doctrines) risks subtle hallucinations or semantic distortions that could mislead unrepresented laypeople.
+- **Document Readability**: Ingested contracts must contain machine-readable text layers. Scanned image-only PDFs without an embedded OCR text stream require OCR pre-processing prior to ingestion.
+- **Educational Scope**: NyayaLens cannot verify signatory mental capacity, authenticate biometric/digital signatures, or provide real-time court docket monitoring. It is designed to prepare clients for consultation with licensed attorneys, never to replace legal counsel.
 
 ---
 

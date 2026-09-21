@@ -5,11 +5,25 @@ export const SESSION_COOKIE_NAME = 'nyayalens_session';
 export const SESSION_HEADER_NAME = 'x-session-id';
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
-// Stable secret from env or auto-generated for runtime
-const SESSION_SECRET =
-  process.env.SESSION_SECRET ||
-  process.env.NEXTAUTH_SECRET ||
-  'nyayalens_production_session_signing_secret_key_v1';
+/**
+ * Resolves the cryptographic session secret.
+ * In production (NODE_ENV === 'production'), a secret must be explicitly set via SESSION_SECRET
+ * or NEXTAUTH_SECRET; failing to configure it throws an unrecoverable Configuration Error.
+ * In development/test environments, a local-only development key is provided.
+ */
+export function getSessionSecret(): string {
+  const secret = process.env.SESSION_SECRET || process.env.NEXTAUTH_SECRET;
+  if (!secret) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error(
+        '[SECURITY CONFIGURATION ERROR] Missing required SESSION_SECRET environment variable in production mode. ' +
+        'Refusing to start session operations with insecure default secret. Please configure SESSION_SECRET in production.'
+      );
+    }
+    return 'nyayalens_development_only_secret_do_not_use_in_production_environment';
+  }
+  return secret;
+}
 
 /**
  * Creates a cryptographically signed session token:
@@ -20,7 +34,8 @@ export function createSignedSessionToken(customSessionId?: string): string {
   const timestamp = Date.now().toString();
   const payload = `${sessionId}.${timestamp}`;
 
-  const hmac = crypto.createHmac('sha256', SESSION_SECRET);
+  const secret = getSessionSecret();
+  const hmac = crypto.createHmac('sha256', secret);
   hmac.update(payload);
   const signature = hmac.digest('hex');
 
@@ -53,7 +68,8 @@ export function verifySessionToken(token: string): {
 
   // Verify HMAC signature
   const payload = `${sessionId}.${timestampStr}`;
-  const hmac = crypto.createHmac('sha256', SESSION_SECRET);
+  const secret = getSessionSecret();
+  const hmac = crypto.createHmac('sha256', secret);
   hmac.update(payload);
   const expectedSignature = hmac.digest('hex');
 

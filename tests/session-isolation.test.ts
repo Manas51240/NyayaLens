@@ -32,6 +32,51 @@ describe('Security & Session Isolation / IDOR Defense', () => {
       expect(verifySessionToken('invalid.token').valid).toBe(false);
       expect(verifySessionToken('ses_123.abc.sig').valid).toBe(false);
     });
+
+    it('fails fast in production mode when SESSION_SECRET is missing', () => {
+      const env = process.env as Record<string, string | undefined>;
+      const originalNodeEnv = env.NODE_ENV;
+      const originalSecret = env.SESSION_SECRET;
+      const originalNextAuth = env.NEXTAUTH_SECRET;
+
+      try {
+        env.NODE_ENV = 'production';
+        delete env.SESSION_SECRET;
+        delete env.NEXTAUTH_SECRET;
+
+        expect(() => {
+          createSignedSessionToken();
+        }).toThrow(/\[SECURITY CONFIGURATION ERROR\] Missing required SESSION_SECRET/);
+      } finally {
+        env.NODE_ENV = originalNodeEnv;
+        if (originalSecret) env.SESSION_SECRET = originalSecret;
+        if (originalNextAuth) env.NEXTAUTH_SECRET = originalNextAuth;
+      }
+    });
+
+    it('successfully creates and verifies tokens in production when SESSION_SECRET is configured', () => {
+      const env = process.env as Record<string, string | undefined>;
+      const originalNodeEnv = env.NODE_ENV;
+      const originalSecret = env.SESSION_SECRET;
+
+      try {
+        env.NODE_ENV = 'production';
+        env.SESSION_SECRET = 'prod_super_secure_cryptographic_secret_key_32_bytes_long';
+
+        const token = createSignedSessionToken('ses_production_user_test');
+        expect(typeof token).toBe('string');
+        const verification = verifySessionToken(token);
+        expect(verification.valid).toBe(true);
+        expect(verification.sessionId).toBe('ses_production_user_test');
+      } finally {
+        env.NODE_ENV = originalNodeEnv;
+        if (originalSecret) {
+          env.SESSION_SECRET = originalSecret;
+        } else {
+          delete env.SESSION_SECRET;
+        }
+      }
+    });
   });
 
   describe('Document Store Ownership & Cross-User Data Isolation', () => {

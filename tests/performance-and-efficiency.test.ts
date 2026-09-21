@@ -7,7 +7,7 @@ import { runGroundedQAPipeline } from '../src/lib/qa/pipeline';
 import { retrieveEvidence } from '../src/lib/qa/retriever';
 import { classifyQueryIntent } from '../src/lib/qa/intent-classifier';
 import { extractAndParseJsonCandidate } from '../src/lib/qa/gemini-synthesis';
-import { checkRateLimit } from '../src/lib/security/rate-limiter';
+import { checkRateLimit, InMemoryRateLimitStore, ProductionDistributedRateLimitStore } from '@/lib/security/rate-limiter';
 import { NextRequest } from 'next/server';
 
 describe('Performance, Indexing & Efficiency Suite', () => {
@@ -121,5 +121,33 @@ describe('Performance, Indexing & Efficiency Suite', () => {
     expect(limit.limit).toBe(50);
     expect(limit.resetSeconds).toBeGreaterThan(0);
     expect(limit.allowed).toBe(true);
+  });
+
+  it('Phase 11: InMemoryRateLimitStore supports bounded eviction and TTL resets', () => {
+    const store = new InMemoryRateLimitStore(2); // Small capacity
+
+    store.set('client-1', { count: 1, resetTime: Date.now() + 10000 });
+    store.set('client-2', { count: 2, resetTime: Date.now() + 10000 });
+    expect(store.get('client-1')?.count).toBe(1);
+    expect(store.get('client-2')?.count).toBe(2);
+
+    // Stale eviction
+    store.set('client-stale', { count: 1, resetTime: Date.now() - 100 });
+    store.cleanup(Date.now(), true);
+    expect(store.get('client-stale')).toBeUndefined();
+
+    // Reset clears completely
+    store.reset();
+    expect(store.get('client-1')).toBeUndefined();
+  });
+
+  it('Phase 11: ProductionDistributedRateLimitStore operates safely in serverless environments', () => {
+    const distStore = new ProductionDistributedRateLimitStore();
+
+    expect(distStore.name).toBeDefined();
+    // Test set & get on distributed store adapter
+    distStore.set('serverless-node-1', { count: 5, resetTime: Date.now() + 5000 });
+    const record = distStore.get('serverless-node-1');
+    expect(record?.count).toBe(5);
   });
 });

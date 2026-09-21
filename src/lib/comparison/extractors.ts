@@ -148,10 +148,12 @@ export function extractDocumentFeatures(doc: LegalDocument): ExtractedFeature[] 
     }
   }
 
+  const seenObligationSections = new Set<string>();
   for (const para of paragraphs) {
     if (/\b(shall\s+(?:hold|maintain|restrict|provide|deliver|perform|comply))\b/i.test(para)) {
       const section = getSectionTitle(para, 'Covenants');
-      if (!features.some((f) => f.dimension === 'obligations' && f.sourceSection === section)) {
+      if (!seenObligationSections.has(section)) {
+        seenObligationSections.add(section);
         features.push({
           dimension: 'obligations',
           title: `Contractual Covenant (${section})`,

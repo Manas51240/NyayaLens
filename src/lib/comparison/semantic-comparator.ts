@@ -5,12 +5,99 @@ import {
   ComparisonCategoryDelta,
   SemanticDeltaItem,
   ReviewPriority,
+  ImportantClause,
 } from '@/types/legal';
 import { extractDocumentFeatures } from './extractors';
 import { ExtractedFeature } from './types';
 
 const COMPARISON_DISCLAIMER_NOTICE =
   'Notice: This comparison highlights contractual variations and attorney review priorities based on semantic text analysis. NyayaLens does not characterize changes as legally definitive determinations of rights, remedies, or business favorability. Please review all modifications with qualified legal counsel.';
+
+export interface IndexedFeatures {
+  byDimension: Map<SemanticDeltaItem['category'], ExtractedFeature[]>;
+  byTitle: Map<string, ExtractedFeature>;
+}
+
+/**
+ * Indexes features into category buckets for O(1) dimension retrieval.
+ */
+export function indexFeatures(features: ExtractedFeature[]): IndexedFeatures {
+  const byDimension = new Map<SemanticDeltaItem['category'], ExtractedFeature[]>();
+  const byTitle = new Map<string, ExtractedFeature>();
+
+  for (const f of features) {
+    let list = byDimension.get(f.dimension);
+    if (!list) {
+      list = [];
+      byDimension.set(f.dimension, list);
+    }
+    list.push(f);
+    byTitle.set(`${f.dimension}::${f.title}`, f);
+  }
+
+  return { byDimension, byTitle };
+}
+
+/**
+ * Fast Category-Bucketed Clause Matching Engine (O(N + M) candidate filtering)
+ * Pre-filters candidates by normalized category, then evaluates similarity only among candidates
+ * in the same bucket, completely eliminating O(N × M) Cartesian product scaling bottlenecks.
+ */
+export function matchAndCompareClauses(
+  clausesA: ImportantClause[] = [],
+  clausesB: ImportantClause[] = []
+): {
+  matched: Array<{ clauseA: ImportantClause; clauseB: ImportantClause; similarity: number }>;
+  added: ImportantClause[];
+  removed: ImportantClause[];
+} {
+  const bucketB = new Map<string, ImportantClause[]>();
+  for (const cb of clausesB) {
+    const cat = (cb.category || 'General').toLowerCase().trim();
+    let list = bucketB.get(cat);
+    if (!list) {
+      list = [];
+      bucketB.set(cat, list);
+    }
+    list.push(cb);
+  }
+
+  const matched: Array<{ clauseA: ImportantClause; clauseB: ImportantClause; similarity: number }> = [];
+  const unmatchedB = new Set<string>(clausesB.map((c) => c.id || c.title));
+  const removed: ImportantClause[] = [];
+
+  for (const ca of clausesA) {
+    const cat = (ca.category || 'General').toLowerCase().trim();
+    const candidates = bucketB.get(cat) || [];
+    let bestMatch: ImportantClause | null = null;
+    let bestSim = 0;
+
+    const wordsA = new Set(ca.title.toLowerCase().split(/\W+/).filter(Boolean));
+    for (const cand of candidates) {
+      if (!unmatchedB.has(cand.id || cand.title)) continue;
+      const wordsB = cand.title.toLowerCase().split(/\W+/).filter(Boolean);
+      let matchCount = 0;
+      for (const w of wordsB) {
+        if (wordsA.has(w)) matchCount++;
+      }
+      const similarity = (2 * matchCount) / (wordsA.size + wordsB.length || 1);
+      if (similarity > bestSim) {
+        bestSim = similarity;
+        bestMatch = cand;
+      }
+    }
+
+    if (bestMatch && bestSim >= 0.3) {
+      matched.push({ clauseA: ca, clauseB: bestMatch, similarity: bestSim });
+      unmatchedB.delete(bestMatch.id || bestMatch.title);
+    } else {
+      removed.push(ca);
+    }
+  }
+
+  const added = clausesB.filter((cb) => unmatchedB.has(cb.id || cb.title));
+  return { matched, added, removed };
+}
 
 /**
  * Performs semantic legal comparison between Document A and Document B across 9 core legal dimensions.
@@ -23,6 +110,9 @@ export function compareDocumentsSemantically(
 ): ComparisonResult {
   const featuresA = extractDocumentFeatures(docA);
   const featuresB = extractDocumentFeatures(docB);
+
+  const idxA = indexFeatures(featuresA);
+  const idxB = indexFeatures(featuresB);
 
   // Aggregated items for all 9 categories
   const deltasByDimension: Record<
@@ -52,8 +142,10 @@ export function compareDocumentsSemantically(
   // -------------------------------------------------------------
   // 1. Dimension: Changed Terms (Structure & Character)
   // -------------------------------------------------------------
-  const structA = featuresA.find((f) => f.dimension === 'changed_terms' && f.title === 'Agreement Structural Character');
-  const structB = featuresB.find((f) => f.dimension === 'changed_terms' && f.title === 'Agreement Structural Character');
+  const termsA = idxA.byDimension.get('changed_terms') || [];
+  const termsB = idxB.byDimension.get('changed_terms') || [];
+  const structA = termsA.find((f) => f.title === 'Agreement Structural Character');
+  const structB = termsB.find((f) => f.title === 'Agreement Structural Character');
 
   if (structA && structB && structA.normalizedValue !== structB.normalizedValue) {
     const isUnilateralB = structB.normalizedValue === 'Unilateral';
@@ -93,8 +185,8 @@ export function compareDocumentsSemantically(
   // -------------------------------------------------------------
   // 2. Dimension: Dates (Effective, Term, Survival)
   // -------------------------------------------------------------
-  const datesA = featuresA.filter((f) => f.dimension === 'dates');
-  const datesB = featuresB.filter((f) => f.dimension === 'dates');
+  const datesA = idxA.byDimension.get('dates') || [];
+  const datesB = idxB.byDimension.get('dates') || [];
 
   // Compare Effective Dates
   const effA = datesA.find((d) => d.attributes.type === 'effectiveDate');
@@ -166,8 +258,8 @@ export function compareDocumentsSemantically(
   // -------------------------------------------------------------
   // 3. Dimension: Obligations (Covenants & Duties)
   // -------------------------------------------------------------
-  const oblsA = featuresA.filter((f) => f.dimension === 'obligations');
-  const oblsB = featuresB.filter((f) => f.dimension === 'obligations');
+  const oblsA = idxA.byDimension.get('obligations') || [];
+  const oblsB = idxB.byDimension.get('obligations') || [];
 
   // Detect asymmetric obligations added in Document B
   const unilateralOblB = oblsB.find((o) => /shall maintain.*no reciprocal|receiving party.*disclosing party shall have no/i.test(o.verbatimSnippet));
@@ -197,8 +289,8 @@ export function compareDocumentsSemantically(
   // -------------------------------------------------------------
   // 4. Dimension: Payment & Financial Terms (Damages & Compensation)
   // -------------------------------------------------------------
-  const payA = featuresA.filter((f) => f.dimension === 'payment');
-  const payB = featuresB.filter((f) => f.dimension === 'payment');
+  const payA = idxA.byDimension.get('payment') || [];
+  const payB = idxB.byDimension.get('payment') || [];
 
   const liqB = payB.find((p) => p.attributes.isLiquidatedDamages);
   const liqA = payA.find((p) => p.attributes.isLiquidatedDamages);
@@ -235,8 +327,8 @@ export function compareDocumentsSemantically(
   // -------------------------------------------------------------
   // 5. Dimension: Termination & Notice Rights
   // -------------------------------------------------------------
-  const termA = featuresA.find((f) => f.dimension === 'termination');
-  const termB = featuresB.find((f) => f.dimension === 'termination');
+  const termA = (idxA.byDimension.get('termination') || [])[0];
+  const termB = (idxB.byDimension.get('termination') || [])[0];
 
   if (termA && termB && termA.normalizedValue !== termB.normalizedValue) {
     const delta: SemanticDeltaItem = {
@@ -269,8 +361,8 @@ export function compareDocumentsSemantically(
   // -------------------------------------------------------------
   // 6. Dimension: Liability & Indemnification
   // -------------------------------------------------------------
-  const liabA = featuresA.find((f) => f.dimension === 'liability');
-  const liabB = featuresB.find((f) => f.dimension === 'liability');
+  const liabA = (idxA.byDimension.get('liability') || [])[0];
+  const liabB = (idxB.byDimension.get('liability') || [])[0];
 
   if (liabA || liabB) {
     const contentA = liabA ? liabA.verbatimSnippet : 'Standard mutual statutory liability';
@@ -308,8 +400,8 @@ export function compareDocumentsSemantically(
   // -------------------------------------------------------------
   // 7. Dimension: Renewal Provisions
   // -------------------------------------------------------------
-  const renewA = featuresA.find((f) => f.dimension === 'renewal');
-  const renewB = featuresB.find((f) => f.dimension === 'renewal');
+  const renewA = (idxA.byDimension.get('renewal') || [])[0];
+  const renewB = (idxB.byDimension.get('renewal') || [])[0];
 
   if (renewA || renewB) {
     const contentA = renewA ? renewA.verbatimSnippet : 'Fixed term; no automatic renewal mechanism detected.';
@@ -347,8 +439,8 @@ export function compareDocumentsSemantically(
   // -------------------------------------------------------------
   // 8. Dimension: Confidentiality & Scope
   // -------------------------------------------------------------
-  const confA = featuresA.find((f) => f.dimension === 'confidentiality');
-  const confB = featuresB.find((f) => f.dimension === 'confidentiality');
+  const confA = (idxA.byDimension.get('confidentiality') || [])[0];
+  const confB = (idxB.byDimension.get('confidentiality') || [])[0];
 
   if (confA && confB && confA.normalizedValue !== confB.normalizedValue) {
     const delta: SemanticDeltaItem = {
@@ -386,8 +478,10 @@ export function compareDocumentsSemantically(
   // -------------------------------------------------------------
   // 9. Dimension: Dispute Provisions (Jurisdiction & Fee Shifting)
   // -------------------------------------------------------------
-  const jurisA = featuresA.find((f) => f.dimension === 'dispute_provisions' && f.title === 'Governing Law and Jurisdiction');
-  const jurisB = featuresB.find((f) => f.dimension === 'dispute_provisions' && f.title === 'Governing Law and Jurisdiction');
+  const disputeA = idxA.byDimension.get('dispute_provisions') || [];
+  const disputeB = idxB.byDimension.get('dispute_provisions') || [];
+  const jurisA = disputeA.find((f) => f.title === 'Governing Law and Jurisdiction');
+  const jurisB = disputeB.find((f) => f.title === 'Governing Law and Jurisdiction');
 
   if (jurisA && jurisB && jurisA.normalizedValue !== jurisB.normalizedValue) {
     const delta: SemanticDeltaItem = {
@@ -423,8 +517,8 @@ export function compareDocumentsSemantically(
   }
 
   // Compare Fee Shifting
-  const feeA = featuresA.find((f) => f.dimension === 'dispute_provisions' && f.title.includes('Fees'));
-  const feeB = featuresB.find((f) => f.dimension === 'dispute_provisions' && f.title.includes('Fees'));
+  const feeA = disputeA.find((f) => f.title.includes('Fees'));
+  const feeB = disputeB.find((f) => f.title.includes('Fees'));
 
   if (feeA && feeB && feeA.normalizedValue !== feeB.normalizedValue) {
     const feeRemoved = feeB.attributes.feeShiftingPresent === false;
@@ -447,6 +541,42 @@ export function compareDocumentsSemantically(
     };
     deltasByDimension.dispute_provisions.push(delta);
     removals.push('Removed prevailing party attorney fee recovery clause.');
+  }
+
+  // -------------------------------------------------------------
+  // 10. Generalized Clause Comparison (Indexed Pre-filtering)
+  // -------------------------------------------------------------
+  if (Array.isArray(docA.clauses) && Array.isArray(docB.clauses) && (docA.clauses.length > 0 || docB.clauses.length > 0)) {
+    const clauseDiff = matchAndCompareClauses(docA.clauses, docB.clauses);
+    for (const match of clauseDiff.matched) {
+      if (match.clauseA.originalText !== match.clauseB.originalText) {
+        const alreadyCovered = changedClauses.some((c) => c.title.toLowerCase() === match.clauseA.title.toLowerCase());
+        if (!alreadyCovered) {
+          changedClauses.push({
+            title: match.clauseA.title,
+            category: match.clauseA.category || 'General',
+            docAContent: match.clauseA.originalText,
+            docBContent: match.clauseB.originalText,
+            riskImpact: 'neutral',
+            explanation: `Clause text modified between Document A and Document B (Similarity index: ${(match.similarity * 100).toFixed(0)}%).`,
+            recommendation: 'Review wording variation with legal counsel.',
+            reviewPriority: 'medium',
+          });
+        }
+      }
+    }
+    for (const rem of clauseDiff.removed) {
+      const already = removals.some((r) => r.toLowerCase().includes(rem.title.toLowerCase()));
+      if (!already) {
+        removals.push(`Removed clause: ${rem.title}`);
+      }
+    }
+    for (const add of clauseDiff.added) {
+      const already = additions.some((a) => a.toLowerCase().includes(add.title.toLowerCase()));
+      if (!already) {
+        additions.push(`Added clause: ${add.title}`);
+      }
+    }
   }
 
   // Helper to build structured category delta

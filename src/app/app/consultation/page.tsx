@@ -345,7 +345,7 @@ function ConsultationContent() {
                   <p className="text-slate-700 leading-relaxed font-sans">{risk.explanation}</p>
                   {risk.quote && (
                     <blockquote className="text-slate-700 italic border-l-2 border-amber-500 pl-2 text-[11px] my-1 font-serif">
-                      "{risk.quote}"
+                      &ldquo;{risk.quote}&rdquo;
                     </blockquote>
                   )}
                 </div>
@@ -363,7 +363,7 @@ function ConsultationContent() {
                 <div key={idx} className="p-3 border border-slate-200 rounded bg-white text-xs space-y-1">
                   <div className="flex items-baseline gap-2">
                     <span className="font-bold text-amber-700">Q{idx + 1}:</span>
-                    <span className="font-semibold text-slate-900">"{q.question}"</span>
+                    <span className="font-semibold text-slate-900">&ldquo;{q.question}&rdquo;</span>
                   </div>
                   {q.rationale && (
                     <p className="text-slate-500 text-[11px] pl-6 font-sans">

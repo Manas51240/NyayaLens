@@ -61,7 +61,7 @@ export default function DisclaimerPage() {
       {/* Review Priority vs Enforceability */}
       <div className="bg-white border border-slate-200 rounded-lg p-6 space-y-4 shadow-2xs">
         <h2 className="text-base font-bold text-slate-900 border-b border-slate-100 pb-2">
-          Understanding "Review Priority" vs "Legal Enforceability"
+          Understanding &ldquo;Review Priority&rdquo; vs &ldquo;Legal Enforceability&rdquo;
         </h2>
         <div className="space-y-3 text-xs sm:text-sm text-slate-700 leading-relaxed">
           <p>
@@ -84,15 +84,15 @@ export default function DisclaimerPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-mono">
           <div className="p-3 bg-white rounded border border-slate-200">
             <span className="text-slate-500 uppercase block text-[10px] font-sans font-bold">Standard Output Phrases:</span>
-            <p className="text-slate-800 mt-1">"The document states..."</p>
-            <p className="text-slate-800">"I found the following section..."</p>
-            <p className="text-slate-800">"I could not find terms mentioning..."</p>
+            <p className="text-slate-800 mt-1">&ldquo;The document states...&rdquo;</p>
+            <p className="text-slate-800">&ldquo;I found the following section...&rdquo;</p>
+            <p className="text-slate-800">&ldquo;I could not find terms mentioning...&rdquo;</p>
           </div>
           <div className="p-3 bg-white rounded border border-slate-200">
             <span className="text-slate-500 uppercase block text-[10px] font-sans font-bold">Action Framing:</span>
-            <p className="text-slate-800 mt-1">"May warrant professional review"</p>
-            <p className="text-slate-800">"Consider discussing with counsel"</p>
-            <p className="text-slate-800">"Suggested question for your attorney"</p>
+            <p className="text-slate-800 mt-1">&ldquo;May warrant professional review&rdquo;</p>
+            <p className="text-slate-800">&ldquo;Consider discussing with counsel&rdquo;</p>
+            <p className="text-slate-800">&ldquo;Suggested question for your attorney&rdquo;</p>
           </div>
         </div>
       </div>

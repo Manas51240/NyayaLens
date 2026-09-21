@@ -1,33 +1,30 @@
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
   CheckSquare,
-  Calendar,
-  HelpCircle,
-  FolderPlus,
   Printer,
-  CheckCircle2,
-  Clock,
-  AlertTriangle,
-  ArrowRight,
-  Filter,
+  Download,
+  FileCode,
   RotateCcw,
   Plus,
-  Trash2,
-  Edit2,
-  Download,
-  X,
-  FileText,
-  User,
-  ShieldAlert
+  ArrowLeft,
+  Calendar,
+  AlertTriangle,
+  HelpCircle,
+  Clock,
+  ShieldCheck,
 } from 'lucide-react';
-import { getStoredDocuments, getStoredDocumentById, saveStoredDocument } from '@/lib/storage';
+import { getStoredDocuments, saveStoredDocument } from '@/lib/storage';
 import { LegalDocument, ActionItem } from '@/types/legal';
 import { AppShell } from '@/components/layout/AppShell';
 import { EmptyState } from '@/components/common/EmptyState';
+import { ActionPlanStats } from '@/components/action-plan/ActionPlanStats';
+import { ActionPlanFilters } from '@/components/action-plan/ActionPlanFilters';
+import { ActionPlanTable } from '@/components/action-plan/ActionPlanTable';
+import { ActionItemModal } from '@/components/action-plan/ActionItemModal';
 
 function ActionPlanContent() {
   const searchParams = useSearchParams();
@@ -37,6 +34,12 @@ function ActionPlanContent() {
   const [completedItems, setCompletedItems] = useState<Record<string, boolean>>({});
   const [actionItems, setActionItems] = useState<ActionItem[]>([]);
   const [mounted, setMounted] = useState(false);
+
+  // Filter & Search states
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterPriority, setFilterPriority] = useState<string>('all');
+  const [filterCategory, setFilterCategory] = useState<string>('all');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'completed'>('all');
 
   // Modal states
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -51,6 +54,35 @@ function ActionPlanContent() {
   const [formNoticePeriod, setFormNoticePeriod] = useState('');
   const [formDocsToGather, setFormDocsToGather] = useState('');
 
+  const loadDocState = (docId: string, docList: LegalDocument[]) => {
+    const targetDoc = docList.find((d) => d.id === docId);
+    if (!targetDoc) return;
+
+    if (typeof window !== 'undefined') {
+      try {
+        const savedCompleted = localStorage.getItem(`nyayalens_action_plan_${docId}`);
+        if (savedCompleted) {
+          setCompletedItems(JSON.parse(savedCompleted));
+        } else {
+          setCompletedItems({});
+        }
+
+        const savedCustom = localStorage.getItem(`nyayalens_actions_${docId}`);
+        if (savedCustom) {
+          const parsed = JSON.parse(savedCustom);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setActionItems(parsed);
+            return;
+          }
+        }
+      } catch {
+        // Fall back gracefully on storage parse error
+      }
+    }
+
+    setActionItems(targetDoc.actionItems || []);
+  };
+
   useEffect(() => {
     const docs = getStoredDocuments();
     setDocuments(docs);
@@ -63,7 +95,7 @@ function ActionPlanContent() {
         setMounted(true);
         return;
       } else {
-        // Try fetching document from server session storage
+        // Asynchronously fetch from server session storage if not in client storage
         fetch(`/api/documents/${docIdParam}`)
           .then((res) => res.json())
           .then((data) => {
@@ -96,36 +128,7 @@ function ActionPlanContent() {
     setMounted(true);
   }, [docIdParam]);
 
-  const loadDocState = (docId: string, docList: LegalDocument[]) => {
-    const targetDoc = docList.find((d) => d.id === docId);
-    if (!targetDoc) return;
-
-    // Load completed status
-    if (typeof window !== 'undefined') {
-      try {
-        const savedCompleted = localStorage.getItem(`nyayalens_action_plan_${docId}`);
-        if (savedCompleted) {
-          setCompletedItems(JSON.parse(savedCompleted));
-        } else {
-          setCompletedItems({});
-        }
-
-        // Load custom / modified action items if available
-        const savedCustom = localStorage.getItem(`nyayalens_actions_${docId}`);
-        if (savedCustom) {
-          const parsed = JSON.parse(savedCustom);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            setActionItems(parsed);
-            return;
-          }
-        }
-      } catch {
-        // Ignore JSON error
-      }
-    }
-
-    setActionItems(targetDoc.actionItems || []);
-  };
+  const activeDoc = documents.find((d) => d.id === selectedDocId);
 
   const handleSelectDoc = (newDocId: string) => {
     setSelectedDocId(newDocId);
@@ -148,9 +151,7 @@ function ActionPlanContent() {
   };
 
   const handleResetChecklist = () => {
-    const activeDoc = documents.find((d) => d.id === selectedDocId);
     if (!activeDoc) return;
-
     if (confirm('Reset action plan back to initial document findings? Custom additions will be cleared.')) {
       if (typeof window !== 'undefined') {
         try {
@@ -175,7 +176,6 @@ function ActionPlanContent() {
     let updatedList: ActionItem[];
 
     if (editingItem) {
-      // Edit existing
       updatedList = actionItems.map((item) =>
         item.id === editingItem.id
           ? {
@@ -191,7 +191,6 @@ function ActionPlanContent() {
           : item
       );
     } else {
-      // Add new
       const newItem: ActionItem = {
         id: `custom_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
         action: formAction.trim(),
@@ -214,7 +213,8 @@ function ActionPlanContent() {
       } catch {}
     }
 
-    closeModal();
+    setIsAddModalOpen(false);
+    setEditingItem(null);
   };
 
   const handleDeleteItem = (itemId: string) => {
@@ -253,11 +253,6 @@ function ActionPlanContent() {
     setIsAddModalOpen(true);
   };
 
-  const closeModal = () => {
-    setIsAddModalOpen(false);
-    setEditingItem(null);
-  };
-
   const handlePrint = () => {
     if (typeof window !== 'undefined') {
       window.print();
@@ -265,7 +260,6 @@ function ActionPlanContent() {
   };
 
   const handleExportMarkdown = () => {
-    const activeDoc = documents.find((d) => d.id === selectedDocId);
     if (!activeDoc) return;
 
     let md = `# Legal Action Plan & Execution Checklist: ${activeDoc.title}\n`;
@@ -319,7 +313,7 @@ function ActionPlanContent() {
     md += `\n`;
 
     md += `## 4. Counsel Questions Agenda\n\n`;
-    activeDoc.risks.forEach((r, idx) => {
+    (activeDoc.risks || []).forEach((r, idx) => {
       md += `${idx + 1}. "${r.suggestedQuestionForLawyer}" (Focus: ${r.title})\n`;
     });
 
@@ -327,13 +321,13 @@ function ActionPlanContent() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `Action_Plan_${activeDoc.fileName.replace(/\.[^.]+$/, '')}.md`;
+    const safeDocName = (activeDoc.fileName || activeDoc.title || 'document').replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, '_');
+    link.download = `Action_Plan_${safeDocName}.md`;
     link.click();
     URL.revokeObjectURL(url);
   };
 
   const handleExportJson = () => {
-    const activeDoc = documents.find((d) => d.id === selectedDocId);
     if (!activeDoc) return;
 
     const exportPayload = {
@@ -346,7 +340,7 @@ function ActionPlanContent() {
         isCompleted: Boolean(completedItems[item.id]),
       })),
       keyDates: activeDoc.keyDates,
-      questionsForCounsel: activeDoc.risks.map((r) => ({
+      questionsForCounsel: (activeDoc.risks || []).map((r) => ({
         question: r.suggestedQuestionForLawyer,
         category: r.category,
       })),
@@ -358,12 +352,45 @@ function ActionPlanContent() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `Action_Plan_${activeDoc.fileName.replace(/\.[^.]+$/, '')}.json`;
+    const safeDocName = (activeDoc.fileName || activeDoc.title || 'document').replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, '_');
+    link.download = `Action_Plan_${safeDocName}.json`;
     link.click();
     URL.revokeObjectURL(url);
   };
 
-  const activeDoc = documents.find((d) => d.id === selectedDocId);
+  // Distinct category list for filter dropdown
+  const uniqueCategories = useMemo(() => {
+    const set = new Set<string>();
+    actionItems.forEach((i) => {
+      if (i.category) set.add(i.category);
+    });
+    return Array.from(set);
+  }, [actionItems]);
+
+  // Filtered action items based on active criteria
+  const filteredActionItems = useMemo(() => {
+    return actionItems.filter((item) => {
+      if (filterPriority !== 'all' && item.priority !== filterPriority) return false;
+      if (filterCategory !== 'all' && item.category !== filterCategory) return false;
+      const isDone = !!completedItems[item.id];
+      if (filterStatus === 'pending' && isDone) return false;
+      if (filterStatus === 'completed' && !isDone) return false;
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const matchAction = item.action.toLowerCase().includes(q);
+        const matchCategory = item.category.toLowerCase().includes(q);
+        const matchParty = item.responsibleParty?.toLowerCase().includes(q);
+        const matchNotice = item.noticePeriod?.toLowerCase().includes(q);
+        if (!matchAction && !matchCategory && !matchParty && !matchNotice) return false;
+      }
+      return true;
+    });
+  }, [actionItems, filterPriority, filterCategory, filterStatus, searchQuery, completedItems]);
+
+  const highPriorityCount = actionItems.filter((a) => a.priority === 'high').length;
+  const completedCount = actionItems.filter((a) => completedItems[a.id]).length;
+  const completionPercentage = actionItems.length > 0 ? Math.round((completedCount / actionItems.length) * 100) : 0;
+  const hasActiveFilters = filterPriority !== 'all' || filterCategory !== 'all' || filterStatus !== 'all' || !!searchQuery.trim();
 
   if (!mounted) return null;
 
@@ -375,9 +402,6 @@ function ActionPlanContent() {
     );
   }
 
-  const highPriorityActions = actionItems.filter((a) => a.priority === 'high');
-  const mediumPriorityActions = actionItems.filter((a) => a.priority !== 'high');
-
   return (
     <AppShell
       activeDocumentId={activeDoc.id}
@@ -388,19 +412,23 @@ function ActionPlanContent() {
       ]}
     >
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 print-page">
-        {/* Header with Print & Export Controls */}
+        {/* Header & Controls Bar */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-6 no-print">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-xs font-bold text-amber-700 uppercase tracking-wide">
-                Execution & Due Diligence Checklist
-              </span>
+              <Link
+                href={`/app/document/${activeDoc.id}`}
+                className="text-xs text-slate-500 hover:text-slate-800 inline-flex items-center gap-1"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>Back to Document</span>
+              </Link>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
-              Contract Action Plan
+            <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">
+              Execution & Due Diligence Action Plan
             </h1>
-            <p className="text-xs sm:text-sm text-slate-500 mt-1">
-              Structured tasks, deadlines, and counsel questions for: <strong>{activeDoc.title}</strong>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Prioritized operational milestones, notice windows, and legal review checklists.
             </p>
           </div>
 
@@ -410,7 +438,6 @@ function ActionPlanContent() {
                 value={selectedDocId}
                 onChange={(e) => handleSelectDoc(e.target.value)}
                 className="text-xs p-2 border border-slate-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-slate-900 font-medium"
-                aria-label="Select document for action plan"
               >
                 {documents.map((d) => (
                   <option key={d.id} value={d.id}>
@@ -422,472 +449,129 @@ function ActionPlanContent() {
 
             <button
               onClick={openAddModal}
-              className="inline-flex items-center gap-1 px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-md shadow-xs transition-colors"
-              title="Add a custom action item"
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-md shadow-2xs transition-colors"
             >
-              <Plus className="w-3.5 h-3.5 text-amber-400" />
+              <Plus className="w-3.5 h-3.5" />
               <span>Add Action</span>
             </button>
 
             <button
               onClick={handleExportMarkdown}
-              className="inline-flex items-center gap-1 px-3 py-2 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 text-xs font-semibold rounded-md transition-colors"
-              title="Export Action Plan as Markdown file"
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 text-xs font-semibold rounded-md shadow-2xs transition-colors"
+              title="Export formatted Markdown checklist"
             >
-              <Download className="w-3.5 h-3.5 text-slate-500" />
+              <Download className="w-3.5 h-3.5" />
               <span>Export MD</span>
             </button>
 
             <button
               onClick={handleExportJson}
-              className="inline-flex items-center gap-1 px-3 py-2 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 text-xs font-semibold rounded-md transition-colors"
-              title="Export Action Plan as JSON"
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 text-xs font-semibold rounded-md shadow-2xs transition-colors"
+              title="Export structured JSON data"
             >
-              <Download className="w-3.5 h-3.5 text-slate-500" />
+              <FileCode className="w-3.5 h-3.5" />
               <span>JSON</span>
             </button>
 
             <button
-              onClick={handleResetChecklist}
-              className="inline-flex items-center gap-1 px-2.5 py-2 bg-white hover:bg-slate-100 border border-slate-300 text-slate-600 text-xs font-semibold rounded-md transition-colors"
-              title="Reset checklist to original findings"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-            </button>
-
-            <button
               onClick={handlePrint}
-              className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold rounded-md transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 text-xs font-semibold rounded-md shadow-2xs transition-colors"
             >
               <Printer className="w-3.5 h-3.5" />
               <span>Print</span>
             </button>
+
+            <button
+              onClick={handleResetChecklist}
+              className="p-2 border border-slate-300 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-md transition-colors"
+              title="Reset checklist to initial document state"
+              aria-label="Reset checklist"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+            </button>
           </div>
         </div>
 
-        {/* Print-Only Header */}
-        <div className="hidden print:block mb-6 border-b pb-4">
-          <h1 className="text-2xl font-bold text-slate-900">Legal Action Plan & Checklist</h1>
-          <p className="text-xs text-slate-600">Document: {activeDoc.title} ({activeDoc.fileName})</p>
-          <p className="text-xs text-slate-600">Generated by NyayaLens AI for client review preparation</p>
-        </div>
+        {/* Metrics Summary Stats */}
+        <ActionPlanStats
+          totalCount={actionItems.length}
+          highPriorityCount={highPriorityCount}
+          completedCount={completedCount}
+          completionPercentage={completionPercentage}
+        />
 
-        {/* Section 1: High Priority Actions */}
-        <section className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-red-800">
-              <AlertTriangle className="w-5 h-5 text-red-600" />
-              <h2 className="text-base sm:text-lg font-bold">High Priority Immediate Actions</h2>
+        {/* Filters and Search Bar */}
+        <ActionPlanFilters
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          filterPriority={filterPriority}
+          onPriorityChange={setFilterPriority}
+          filterCategory={filterCategory}
+          onCategoryChange={setFilterCategory}
+          filterStatus={filterStatus}
+          onStatusChange={setFilterStatus}
+          categories={uniqueCategories}
+          hasActiveFilters={hasActiveFilters}
+          onResetFilters={() => {
+            setSearchQuery('');
+            setFilterPriority('all');
+            setFilterCategory('all');
+            setFilterStatus('all');
+          }}
+        />
+
+        {/* Action Items List Table */}
+        <ActionPlanTable
+          items={filteredActionItems}
+          completedItems={completedItems}
+          onToggleComplete={toggleComplete}
+          onEdit={openEditModal}
+          onDelete={handleDeleteItem}
+          onOpenAddModal={openAddModal}
+        />
+
+        {/* Critical Dates Section */}
+        {activeDoc.keyDates && activeDoc.keyDates.length > 0 && (
+          <section className="bg-white border border-slate-200 rounded-lg p-6 space-y-4 shadow-xs">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2 border-b border-slate-100 pb-2">
+              <Calendar className="w-4 h-4 text-indigo-600" />
+              <span>Identified Key Contract Milestones & Dates</span>
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+              {activeDoc.keyDates.map((kd, idx) => (
+                <div key={idx} className="p-3 bg-slate-50 rounded border border-slate-200">
+                  <span className="text-slate-500 block font-medium text-[11px]">{kd.label}</span>
+                  <span className="text-slate-900 font-bold mt-0.5 block">{kd.date}</span>
+                </div>
+              ))}
             </div>
-            <span className="text-xs font-semibold text-red-700 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">
-              {highPriorityActions.length} items
-            </span>
-          </div>
-
-          <div className="space-y-3">
-            {highPriorityActions.length === 0 ? (
-              <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-500 italic">
-                No high-priority immediate flags recorded for this agreement.
-              </div>
-            ) : (
-              highPriorityActions.map((item) => {
-                const isDone = !!completedItems[item.id];
-                return (
-                  <div
-                    key={item.id}
-                    className={`p-4 rounded-lg border transition-all ${
-                      isDone
-                        ? 'bg-slate-50 border-slate-200 opacity-60'
-                        : 'bg-white border-red-200 shadow-2xs'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-start gap-3 flex-1">
-                        <input
-                          type="checkbox"
-                          checked={isDone}
-                          onChange={() => toggleComplete(item.id)}
-                          className="mt-1 h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900 cursor-pointer"
-                          id={`check-${item.id}`}
-                        />
-                        <div className="space-y-1 flex-1">
-                          <label
-                            htmlFor={`check-${item.id}`}
-                            className={`text-sm font-semibold cursor-pointer block ${
-                              isDone ? 'line-through text-slate-500' : 'text-slate-900'
-                            }`}
-                          >
-                            {item.action}
-                          </label>
-
-                          <div className="flex items-center gap-3 text-xs text-slate-500 flex-wrap">
-                            <span className="font-bold text-red-700 bg-red-50 px-2 py-0.5 rounded">
-                              {item.category}
-                            </span>
-                            {item.timeline && (
-                              <span className="flex items-center gap-1 text-slate-600 font-medium">
-                                <Clock className="w-3 h-3 text-slate-400" />
-                                {item.timeline}
-                              </span>
-                            )}
-                            {item.responsibleParty && (
-                              <span className="flex items-center gap-1 text-slate-600 font-medium">
-                                <User className="w-3 h-3 text-slate-400" />
-                                {item.responsibleParty}
-                              </span>
-                            )}
-                            {item.noticePeriod && (
-                              <span className="text-[11px] text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded">
-                                Notice: {item.noticePeriod}
-                              </span>
-                            )}
-                          </div>
-
-                          {/* Documents to Gather */}
-                          {item.documentsToGather && item.documentsToGather.length > 0 && (
-                            <div className="mt-2 text-xs bg-slate-50 rounded p-2.5 border border-slate-200">
-                              <span className="font-bold text-slate-700 block mb-0.5">
-                                Supporting Documents to Gather for Counsel:
-                              </span>
-                              <ul className="list-disc list-inside space-y-0.5 text-slate-600">
-                                {item.documentsToGather.map((doc, idx) => (
-                                  <li key={idx}>{doc}</li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Edit / Delete actions */}
-                      <div className="flex items-center gap-1 no-print">
-                        <button
-                          onClick={() => openEditModal(item)}
-                          className="p-1 text-slate-400 hover:text-slate-700 rounded transition-colors"
-                          title="Edit action item"
-                          aria-label="Edit action item"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteItem(item.id)}
-                          className="p-1 text-slate-400 hover:text-red-600 rounded transition-colors"
-                          title="Delete action item"
-                          aria-label="Delete action item"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </section>
-
-        {/* Section 2: Review Items & Operational Tasks */}
-        <section className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-slate-900">
-              <CheckSquare className="w-5 h-5 text-amber-600" />
-              <h2 className="text-base sm:text-lg font-bold">Operational Review Checklist</h2>
-            </div>
-            <span className="text-xs font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full">
-              {mediumPriorityActions.length} items
-            </span>
-          </div>
-
-          <div className="space-y-3">
-            {mediumPriorityActions.length === 0 ? (
-              <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-500 italic">
-                No operational review items recorded. Click "Add Action" to create one.
-              </div>
-            ) : (
-              mediumPriorityActions.map((item) => {
-                const isDone = !!completedItems[item.id];
-                return (
-                  <div
-                    key={item.id}
-                    className={`p-4 rounded-lg border transition-all ${
-                      isDone
-                        ? 'bg-slate-50 border-slate-200 opacity-60'
-                        : 'bg-white border-slate-200 shadow-2xs'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-start gap-3 flex-1">
-                        <input
-                          type="checkbox"
-                          checked={isDone}
-                          onChange={() => toggleComplete(item.id)}
-                          className="mt-1 h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900 cursor-pointer"
-                          id={`check-${item.id}`}
-                        />
-                        <div className="space-y-1 flex-1">
-                          <label
-                            htmlFor={`check-${item.id}`}
-                            className={`text-sm font-semibold cursor-pointer block ${
-                              isDone ? 'line-through text-slate-500' : 'text-slate-900'
-                            }`}
-                          >
-                            {item.action}
-                          </label>
-                          <div className="flex items-center gap-3 text-xs text-slate-500 flex-wrap">
-                            <span className="font-medium text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
-                              {item.category}
-                            </span>
-                            {item.timeline && (
-                              <span className="flex items-center gap-1 text-slate-600">
-                                <Clock className="w-3 h-3 text-slate-400" />
-                                {item.timeline}
-                              </span>
-                            )}
-                            {item.responsibleParty && (
-                              <span className="flex items-center gap-1 text-slate-600 font-medium">
-                                <User className="w-3 h-3 text-slate-400" />
-                                {item.responsibleParty}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-1 no-print">
-                        <button
-                          onClick={() => openEditModal(item)}
-                          className="p-1 text-slate-400 hover:text-slate-700 rounded transition-colors"
-                          title="Edit action item"
-                          aria-label="Edit action item"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteItem(item.id)}
-                          className="p-1 text-slate-400 hover:text-red-600 rounded transition-colors"
-                          title="Delete action item"
-                          aria-label="Delete action item"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </section>
-
-        {/* Section 3: Important Calendar Dates */}
-        <section className="bg-white border border-slate-200 rounded-lg p-5 shadow-2xs space-y-3">
-          <div className="flex items-center gap-2 text-slate-900">
-            <Calendar className="w-4 h-4 text-slate-600" />
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
-              Critical Dates & Notice Windows
-            </h3>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="p-3 bg-slate-50 border border-slate-200 rounded">
-              <span className="text-[10px] text-slate-500 uppercase tracking-wide block font-bold">
-                Effective Date
-              </span>
-              <span className="text-xs sm:text-sm font-semibold text-slate-900">
-                {activeDoc.effectiveDate || 'Unspecified'}
-              </span>
-            </div>
-
-            <div className="p-3 bg-slate-50 border border-slate-200 rounded">
-              <span className="text-[10px] text-slate-500 uppercase tracking-wide block font-bold">
-                Expiration / Term End
-              </span>
-              <span className="text-xs sm:text-sm font-semibold text-slate-900">
-                {activeDoc.expirationDate || 'Unspecified'}
-              </span>
-            </div>
-
-            {activeDoc.keyDates?.map((kd, i) => (
-              <div
-                key={i}
-                className={`p-3 rounded border ${
-                  kd.isCritical
-                    ? 'bg-red-50/70 border-red-200'
-                    : 'bg-slate-50 border-slate-200'
-                }`}
-              >
-                <span className={`text-[10px] uppercase tracking-wide block font-bold ${
-                  kd.isCritical ? 'text-red-700' : 'text-slate-500'
-                }`}>
-                  {kd.label}
-                </span>
-                <span className="text-xs sm:text-sm font-semibold text-slate-900">
-                  {kd.date}
-                </span>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* Section 4: Target Questions for Legal Professional */}
-        <section className="bg-slate-50 border border-slate-200 rounded-lg p-5 space-y-3">
-          <div className="flex items-center gap-2 text-slate-900">
-            <HelpCircle className="w-4 h-4 text-slate-600" />
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
-              Target Questions to Bring to Your Lawyer
-            </h3>
-          </div>
-          <p className="text-xs text-slate-600">
-            Bring these specific, grounded questions to your attorney meeting to prioritize high-risk terms and avoid unnecessary billable time.
-          </p>
-          <ul className="space-y-2 text-xs sm:text-sm text-slate-800">
-            {activeDoc.risks.map((r, idx) => (
-              <li key={idx} className="bg-white border border-slate-200 rounded p-3 flex items-start gap-2.5">
-                <span className="font-bold text-amber-700 shrink-0">Q{idx + 1}:</span>
-                <div className="space-y-0.5">
-                  <span className="font-medium italic text-slate-900">"{r.suggestedQuestionForLawyer}"</span>
-                  <span className="text-[11px] text-slate-500 block">
-                    Focus: {r.title} ({r.category})
-                  </span>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </section>
-
-        {/* Add / Edit Action Item Modal */}
-        {isAddModalOpen && (
-          <div className="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-lg shadow-xl max-w-lg w-full p-6 space-y-5">
-              <div className="flex items-center justify-between border-b pb-3">
-                <h3 className="text-base font-bold text-slate-900">
-                  {editingItem ? 'Edit Action Item' : 'Add New Action Item'}
-                </h3>
-                <button
-                  onClick={closeModal}
-                  className="text-slate-400 hover:text-slate-600 p-1"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <form onSubmit={handleSaveActionItem} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-1">
-                    Action Description *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={formAction}
-                    onChange={(e) => setFormAction(e.target.value)}
-                    placeholder="e.g. Provide written opt-out notice to landlord"
-                    className="w-full text-xs sm:text-sm p-2.5 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-1">
-                      Review Priority
-                    </label>
-                    <select
-                      value={formPriority}
-                      onChange={(e) => setFormPriority(e.target.value as 'high' | 'medium' | 'low')}
-                      className="w-full text-xs p-2.5 border border-slate-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-slate-900 font-medium"
-                    >
-                      <option value="high">High Priority</option>
-                      <option value="medium">Medium Priority</option>
-                      <option value="low">Low Priority</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-1">
-                      Category
-                    </label>
-                    <input
-                      type="text"
-                      value={formCategory}
-                      onChange={(e) => setFormCategory(e.target.value)}
-                      placeholder="e.g. Termination, Notice"
-                      className="w-full text-xs p-2.5 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-1">
-                      Timeline / Deadline
-                    </label>
-                    <input
-                      type="text"
-                      value={formTimeline}
-                      onChange={(e) => setFormTimeline(e.target.value)}
-                      placeholder="e.g. Within 30 days"
-                      className="w-full text-xs p-2.5 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-1">
-                      Responsible Party
-                    </label>
-                    <input
-                      type="text"
-                      value={formResponsibleParty}
-                      onChange={(e) => setFormResponsibleParty(e.target.value)}
-                      placeholder="e.g. Tenant, Legal Lead"
-                      className="w-full text-xs p-2.5 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-1">
-                    Notice Window (if applicable)
-                  </label>
-                  <input
-                    type="text"
-                    value={formNoticePeriod}
-                    onChange={(e) => setFormNoticePeriod(e.target.value)}
-                    placeholder="e.g. 60 days prior to renewal"
-                    className="w-full text-xs p-2.5 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-1">
-                    Documents to Gather (one per line)
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={formDocsToGather}
-                    onChange={(e) => setFormDocsToGather(e.target.value)}
-                    placeholder="Original lease agreement&#10;Certified mail receipt"
-                    className="w-full text-xs p-2.5 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900"
-                  />
-                </div>
-
-                <div className="flex justify-end gap-2 pt-2 border-t">
-                  <button
-                    type="button"
-                    onClick={closeModal}
-                    className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-md"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white rounded-md shadow-xs"
-                  >
-                    {editingItem ? 'Update Item' : 'Add Item'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
+          </section>
         )}
+
+        {/* Accessible Add/Edit Action Item Modal with strict circular focus trap */}
+        <ActionItemModal
+          isOpen={isAddModalOpen}
+          editingItem={editingItem}
+          formAction={formAction}
+          setFormAction={setFormAction}
+          formPriority={formPriority}
+          setFormPriority={setFormPriority}
+          formCategory={formCategory}
+          setFormCategory={setFormCategory}
+          formTimeline={formTimeline}
+          setFormTimeline={setFormTimeline}
+          formResponsibleParty={formResponsibleParty}
+          setFormResponsibleParty={setFormResponsibleParty}
+          formNoticePeriod={formNoticePeriod}
+          setFormNoticePeriod={setFormNoticePeriod}
+          formDocsToGather={formDocsToGather}
+          setFormDocsToGather={setFormDocsToGather}
+          onClose={() => {
+            setIsAddModalOpen(false);
+            setEditingItem(null);
+          }}
+          onSave={handleSaveActionItem}
+        />
       </div>
     </AppShell>
   );

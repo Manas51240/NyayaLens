@@ -9,8 +9,8 @@ export async function extractPdf(buffer: Buffer): Promise<{ text: string; notes?
   let pageCount = 0;
 
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const pdfParse = require('pdf-parse');
+    const pdfParseModule = await import('pdf-parse');
+    const pdfParse = pdfParseModule.default || pdfParseModule;
     const data = await pdfParse(buffer);
     const text = data.text || '';
     pageCount = data.numpages || 0;

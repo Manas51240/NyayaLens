@@ -26,7 +26,7 @@ export const Footer: React.FC = () => {
               <span className="text-base font-bold text-white tracking-wide">NYAYALENS</span>
             </div>
             <p className="text-xs text-slate-400 leading-relaxed max-w-md">
-              "Understand your legal documents. Know what matters. Take the next safe step."
+              &ldquo;Understand your legal documents. Know what matters. Take the next safe step.&rdquo;
               NyayaLens empowers individuals and teams with AI-assisted document comprehension and structured review briefs without replacing professional legal counsel.
             </p>
             <div className="p-3 rounded-lg bg-slate-800/80 border border-slate-700/60 text-xs text-slate-300 flex items-start gap-2 max-w-md">

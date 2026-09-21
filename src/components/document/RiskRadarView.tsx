@@ -232,7 +232,7 @@ export const RiskRadarView: React.FC<RiskRadarViewProps> = ({ risks, documentTit
 
         {filteredRisks.length === 0 ? (
           <div className="p-8 text-center bg-white rounded-lg border border-slate-200 text-xs sm:text-sm text-slate-500">
-            No risk findings match the selected filter criteria. Try selecting "All" or choosing another category.
+            No risk findings match the selected filter criteria. Try selecting &ldquo;All&rdquo; or choosing another category.
           </div>
         ) : (
           filteredRisks.map((risk) => {
@@ -300,7 +300,7 @@ export const RiskRadarView: React.FC<RiskRadarViewProps> = ({ risks, documentTit
                           </button>
                         </div>
                         <blockquote className="italic border-l-2 border-slate-400 pl-2 my-1">
-                          "{risk.quote}"
+                          &ldquo;{risk.quote}&rdquo;
                         </blockquote>
                       </div>
                     )}
@@ -339,7 +339,7 @@ export const RiskRadarView: React.FC<RiskRadarViewProps> = ({ risks, documentTit
                             </button>
                           </div>
                           <p className="text-xs text-slate-800 italic leading-relaxed">
-                            "{risk.suggestedQuestionForLawyer}"
+                            &ldquo;{risk.suggestedQuestionForLawyer}&rdquo;
                           </p>
                         </div>
                       )}

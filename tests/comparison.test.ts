@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { compareLegalDocuments } from '../src/lib/grounded-ai-engine';
+import { matchAndCompareClauses } from '../src/lib/comparison/semantic-comparator';
 import { SAMPLE_DOCUMENTS, SAMPLE_NDA_V2_REVISED } from '../src/lib/sample-documents';
+import { ImportantClause } from '../src/types/legal';
 
 describe('Semantic Document Comparison Engine', () => {
   const standardNda = SAMPLE_DOCUMENTS[3]; // Mutual NDA v1 Base
@@ -119,5 +121,106 @@ describe('Semantic Document Comparison Engine', () => {
     expect(comparison.legalDisclaimer).toContain('Notice:');
     expect(comparison.legalDisclaimer).toContain('attorney review priorities');
     expect(comparison.legalDisclaimer).toContain('does not characterize changes as legally definitive');
+  });
+
+  describe('Comparison Scaling Benchmark & Regression Suite', () => {
+    function generateSyntheticClauses(count: number): ImportantClause[] {
+      const categories = ['Payment', 'Termination', 'Liability', 'Confidentiality', 'Intellectual Property', 'Dispute Resolution', 'Warranties', 'Governance'];
+      const clauses: ImportantClause[] = [];
+      for (let i = 0; i < count; i++) {
+        const cat = categories[i % categories.length];
+        clauses.push({
+          id: `clause-${i + 1}`,
+          title: `Section ${i + 1} - Standard ${cat} Protocol ${i + 1}`,
+          category: cat,
+          originalText: `The parties shall adhere to ${cat.toLowerCase()} terms under standard operating requirements for clause iteration ${i + 1}.`,
+          plainEnglishTranslation: `Plain translation for clause ${i + 1}`,
+          sourceSection: `Section ${i + 1}`,
+          severity: (i % 4 === 0 ? 'high' : 'medium') as 'high' | 'medium',
+          confidence: 90,
+          suggestedAction: 'Review with counsel',
+        });
+      }
+      return clauses;
+    }
+
+    it('benchmarks comparison scaling across 10, 50, 100, and 200+ clauses', () => {
+      const benchmarks: Record<string, { count: number; elapsedMs: number; matchedCount: number }> = {};
+
+      const sizes = [10, 50, 100, 250];
+
+      for (const size of sizes) {
+        const clausesA = generateSyntheticClauses(size);
+        // Version B has 80% matching clauses, 10% modified text, 10% added new clauses
+        const clausesB = clausesA.slice(0, Math.floor(size * 0.9)).map((c, idx) => {
+          if (idx % 5 === 0) {
+            return { ...c, id: `${c.id}-revised`, originalText: `${c.originalText} Revised terms apply.` };
+          }
+          return { ...c };
+        });
+        // Add additional clauses
+        for (let j = 0; j < Math.floor(size * 0.1); j++) {
+          clausesB.push({
+            id: `new-clause-${j}`,
+            title: `Section New.${j} - Additional Protocol`,
+            category: 'Governance',
+            originalText: `Newly inserted clause ${j} in version B.`,
+            plainEnglishTranslation: 'New clause',
+            sourceSection: 'Section New',
+            severity: 'medium',
+            confidence: 85,
+            suggestedAction: 'Review with counsel',
+          });
+        }
+
+        const start = performance.now();
+        const diff = matchAndCompareClauses(clausesA, clausesB);
+        const elapsed = performance.now() - start;
+
+        benchmarks[`${size}_clauses`] = {
+          count: size,
+          elapsedMs: elapsed,
+          matchedCount: diff.matched.length,
+        };
+
+        // Assert accuracy: matched count should correspond to shared clauses
+        expect(diff.matched.length).toBeGreaterThanOrEqual(Math.floor(size * 0.8));
+        // Sub-quadratic execution: 250 clauses must finish in well under 100ms
+        expect(elapsed).toBeLessThan(100);
+      }
+
+      // Log benchmark results for transparency
+      console.log('--- Comparison Engine Scaling Benchmarks (Indexed Pre-filtering) ---');
+      console.log(`10 clauses:  ${benchmarks['10_clauses'].elapsedMs.toFixed(3)} ms (matched: ${benchmarks['10_clauses'].matchedCount})`);
+      console.log(`50 clauses:  ${benchmarks['50_clauses'].elapsedMs.toFixed(3)} ms (matched: ${benchmarks['50_clauses'].matchedCount})`);
+      console.log(`100 clauses: ${benchmarks['100_clauses'].elapsedMs.toFixed(3)} ms (matched: ${benchmarks['100_clauses'].matchedCount})`);
+      console.log(`250 clauses: ${benchmarks['250_clauses'].elapsedMs.toFixed(3)} ms (matched: ${benchmarks['250_clauses'].matchedCount})`);
+      console.log('-------------------------------------------------------------------');
+    });
+
+    it('seamlessly integrates generalized clause deltas into document comparison without accuracy loss', () => {
+      const docWithClausesA = {
+        ...standardNda,
+        id: 'doc-clauses-a',
+        clauses: [
+          { id: 'c1', title: 'Audit Rights', category: 'Compliance', originalText: 'Annual audit permitted upon 30 days notice.', plainEnglishTranslation: 'Audit permitted', sourceSection: 'Section 1', severity: 'medium' as const, confidence: 90, suggestedAction: 'Verify' },
+          { id: 'c2', title: 'Data Retention', category: 'Privacy', originalText: 'Data retained for 1 year.', plainEnglishTranslation: 'Data retained 1 yr', sourceSection: 'Section 2', severity: 'high' as const, confidence: 90, suggestedAction: 'Verify' },
+        ],
+      };
+
+      const docWithClausesB = {
+        ...revisedNda,
+        id: 'doc-clauses-b',
+        clauses: [
+          { id: 'c1', title: 'Audit Rights', category: 'Compliance', originalText: 'Annual audit strictly prohibited.', plainEnglishTranslation: 'Audit prohibited', sourceSection: 'Section 1', severity: 'high' as const, confidence: 90, suggestedAction: 'Verify' },
+          { id: 'c3', title: 'Security Safeguards', category: 'Security', originalText: 'ISO 27001 compliance mandatory.', plainEnglishTranslation: 'ISO 27001 needed', sourceSection: 'Section 3', severity: 'high' as const, confidence: 90, suggestedAction: 'Verify' },
+        ],
+      };
+
+      const comparison = compareLegalDocuments(docWithClausesA, docWithClausesB);
+      expect(comparison.changedClauses.some((c) => c.title === 'Audit Rights')).toBe(true);
+      expect(comparison.additions.some((a) => a.includes('Security Safeguards'))).toBe(true);
+      expect(comparison.removals.some((r) => r.includes('Data Retention'))).toBe(true);
+    });
   });
 });

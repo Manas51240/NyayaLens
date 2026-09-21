@@ -41,19 +41,19 @@ export const AskDocumentChat: React.FC<AskDocumentChatProps> = ({
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const initialGreeting = (): ChatMessage => ({
+  const createGreeting = React.useCallback((): ChatMessage => ({
     id: `welcome-${Date.now()}`,
     sender: 'assistant',
     text: `Hello! I am your grounded legal document assistant for "${document.title}". Ask me any question about the obligations, terms, notice periods, or clauses in this document. Every answer I provide will cite exact excerpts from the text. If a term is not in the document, I will clearly state that it cannot be found.`,
     timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-  });
+  }), [document.title]);
 
-  const [messages, setMessages] = useState<ChatMessage[]>([initialGreeting()]);
+  const [messages, setMessages] = useState<ChatMessage[]>([createGreeting()]);
 
   // Reset chat greeting when switching documents
   useEffect(() => {
-    setMessages([initialGreeting()]);
-  }, [document.id, document.title]);
+    setMessages([createGreeting()]);
+  }, [document.id, createGreeting]);
 
   // Auto-scroll to bottom whenever messages or loading state changes
   useEffect(() => {
@@ -281,7 +281,7 @@ export const AskDocumentChat: React.FC<AskDocumentChatProps> = ({
                       title={onInspectCitation ? 'Click to inspect in Evidence Drawer' : undefined}
                     >
                       <blockquote className="italic border-l-2 border-amber-500 pl-2">
-                        "{ev.quote}"
+                        &ldquo;{ev.quote}&rdquo;
                       </blockquote>
                       <div className="flex items-center justify-between text-[10px] text-slate-500 font-sans mt-1.5">
                         <span className="font-semibold text-slate-700">Source Section: {ev.section}</span>
@@ -319,7 +319,7 @@ export const AskDocumentChat: React.FC<AskDocumentChatProps> = ({
                     <ul className="list-disc list-inside space-y-0.5 text-slate-600">
                       {msg.responsePayload.suggestedFollowUpQuestions.map((q, idx) => (
                         <li key={idx} className="italic">
-                          "{q}"
+                          &ldquo;{q}&rdquo;
                         </li>
                       ))}
                     </ul>

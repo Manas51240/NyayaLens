@@ -122,7 +122,7 @@ export const GroundedClauseCard: React.FC<GroundedClauseCardProps> = ({
             Source: {clause.pageOrRef || clause.sourceSection}
           </div>
           <blockquote className="border-l-2 border-amber-400 pl-3 italic">
-            "{clause.originalText}"
+            &ldquo;{clause.originalText}&rdquo;
           </blockquote>
         </div>
       )}

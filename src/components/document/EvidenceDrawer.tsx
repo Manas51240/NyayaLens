@@ -143,7 +143,7 @@ export const EvidenceDrawer: React.FC<EvidenceDrawerProps> = ({
           </div>
           <div className="p-4 rounded-lg bg-slate-900 text-slate-100 font-serif leading-relaxed text-xs sm:text-sm border border-slate-800 shadow-inner">
             <blockquote className="border-l-2 border-amber-400 pl-3 italic">
-              "{quote}"
+              &ldquo;{quote}&rdquo;
             </blockquote>
           </div>
         </div>
