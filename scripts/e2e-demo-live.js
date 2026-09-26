@@ -6,7 +6,7 @@ async function runLiveAudit() {
   console.log('NYAYALENS II2S EXCLUSIVE — LIVE SERVER END-TO-END AUDIT');
   console.log('===============================================================\n');
 
-  const BASE_URL = 'http://localhost:3000';
+  const BASE_URL = (process.argv[2] || 'http://localhost:3000').replace(/\/$/, '');
 
   // 1. Health Check
   console.log('[1/7] Testing /api/health...');
