@@ -35,7 +35,7 @@ export function extractDocumentFeatures(doc: LegalDocument): ExtractedFeature[] 
   }
 
   // Helper to extract snippet around match
-  function getSnippet(text: string, maxLen = 220): string {
+  function getSnippet(text: string, maxLen = 450): string {
     const clean = text.replace(/\s+/g, ' ').trim();
     if (clean.length <= maxLen) return clean;
     return clean.substring(0, maxLen).trim() + '...';
@@ -167,11 +167,13 @@ export function extractDocumentFeatures(doc: LegalDocument): ExtractedFeature[] 
   }
 
   // -------------------------------------------------------------
-  // 4. Payment & Financial Obligations (Fees, Liquidated Damages)
+  // 4. Payment & Financial Obligations (Fees, Liquidated Damages, Invoices)
   // -------------------------------------------------------------
   for (const para of paragraphs) {
     const hasLiquidatedDamages = /\bliquidated\s+damages\b/i.test(para);
     const hasDollarAmount = /\$[0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{2})?|\b[0-9]+\s*(?:dollars|fees|salary|rent|clawback)\b/i.test(para);
+    const hasCurrencyAmount = /\b(?:INR|Rs\.?|USD|\$|EUR|GBP)\s*[0-9,]+(?:\.[0-9]{2})?/i.test(para);
+    const invoiceDueMatch = para.match(/\b(?:payable|due)\s+within\s+([0-9]{1,3}\s*days?(?:\s+of\s+receipt)?)/i);
 
     if (hasLiquidatedDamages) {
       features.push({
@@ -185,13 +187,25 @@ export function extractDocumentFeatures(doc: LegalDocument): ExtractedFeature[] 
           amount: para.match(/\$[0-9,]+/)?.[0] || 'Variable',
         },
       });
-    } else if (hasDollarAmount && /\b(pay|salary|rent|fee|bonus|deposit|compensation|clawback)\b/i.test(para)) {
+    } else if (invoiceDueMatch) {
+      features.push({
+        dimension: 'payment',
+        title: 'Invoice Payment Due Window',
+        sourceSection: getSectionTitle(para, 'Fees and Payment'),
+        verbatimSnippet: getSnippet(para),
+        normalizedValue: `Payable within ${invoiceDueMatch[1]}`,
+        attributes: {
+          duePeriod: invoiceDueMatch[1],
+        },
+      });
+    } else if ((hasDollarAmount || hasCurrencyAmount) && /\b(pay|salary|rent|fee|bonus|deposit|compensation|clawback)\b/i.test(para)) {
+      const currMatch = para.match(/(?:INR|Rs\.?|\$|EUR|GBP)\s*[0-9,]+(?:\s*(?:per|\/)\s*(?:month|year|violation))?/i);
       features.push({
         dimension: 'payment',
         title: 'Payment and Compensation Terms',
         sourceSection: getSectionTitle(para, 'Payment Provisions'),
         verbatimSnippet: getSnippet(para),
-        normalizedValue: para.match(/\$[0-9,]+(?:\s*(?:per|\/)\s*(?:month|year|violation))?/)?.[0] || 'Compensation specified',
+        normalizedValue: currMatch ? currMatch[0] : (para.match(/\$[0-9,]+/)?.[0] || 'Compensation specified'),
         attributes: {},
       });
     }
@@ -203,7 +217,7 @@ export function extractDocumentFeatures(doc: LegalDocument): ExtractedFeature[] 
   for (const para of paragraphs) {
     if (/\b(termination|terminate|cancel|cancellation|without\s+cause|for\s+cause|notice\s+period)\b/i.test(para)) {
       const section = getSectionTitle(para, 'Termination');
-      const noticeMatch = para.match(/\b([0-9]{1,3})\s*(?:days?|business\s+days?|months?)\s+(?:prior|written\s+notice|advance\s+notice)\b/i);
+      const noticeMatch = para.match(/\b([0-9]{1,3})\s*(?:days?['’]?|business\s+days?['’]?|months?['’]?)\s*(?:prior|written\s+notice|advance\s+notice)\b/i);
       features.push({
         dimension: 'termination',
         title: 'Termination Protocol and Notice Requirements',

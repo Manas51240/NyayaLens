@@ -51,10 +51,23 @@ function computeDocumentKey(doc: LegalDocument): string {
 export function buildDocumentIndex(document: LegalDocument): DocumentIndex {
   const sanitizedRawText = sanitizeDocumentContentForQA(document.rawText || '');
   
-  const rawParas = sanitizedRawText
-    .split(/\n\s*\n/)
+  // Split on paragraph breaks OR section headings (e.g. "1. Services and Scope", "Section 2.", "Article 3", "§ 4")
+  const rawParts = sanitizedRawText
+    .split(/(?:\n\s*\n|\n(?=(?:SECTION|ARTICLE|§|[0-9]{1,2}\.)\s*[A-Za-z]))/i)
     .map((p) => p.trim())
-    .filter((p) => p.length > 20);
+    .filter(Boolean);
+
+  // Merge short standalone section headings with the subsequent text block so headings are retained
+  const rawParas: string[] = [];
+  for (let i = 0; i < rawParts.length; i++) {
+    const part = rawParts[i];
+    if (part.length < 60 && /^(?:SECTION|ARTICLE|§|[0-9]{1,2}\.)/i.test(part) && i + 1 < rawParts.length) {
+      rawParas.push(part + '\n' + rawParts[i + 1]);
+      i++;
+    } else if (part.length > 15) {
+      rawParas.push(part);
+    }
+  }
 
   const paragraphs: IndexedParagraph[] = [];
 
@@ -73,7 +86,7 @@ export function buildDocumentIndex(document: LegalDocument): DocumentIndex {
     // Extract section header if present
     let sectionTitle = 'Document Excerpt';
     const firstLine = para.split('\n')[0].trim();
-    if (/^(SECTION|ARTICLE|§|[0-9]{1,2}\.)/i.test(firstLine) && firstLine.length < 70) {
+    if (/^(SECTION|ARTICLE|§|[0-9]{1,2}\.)/i.test(firstLine) && firstLine.length < 80) {
       sectionTitle = firstLine;
     }
 

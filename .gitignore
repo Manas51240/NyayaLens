@@ -40,6 +40,7 @@ next-env.d.ts
 /temp
 /scratch
 *.pdf
+!NyayaLens_Demo_Legal_Agreement*.pdf
 *.docx
 !public/**/*.svg
 !public/**/*.png

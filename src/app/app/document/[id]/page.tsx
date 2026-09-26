@@ -117,7 +117,14 @@ export default function DocumentOverviewPage() {
                 </h1>
               </div>
 
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                <Link
+                  href={`/app/document/${doc.id}/language`}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 text-xs font-semibold transition-colors"
+                >
+                  <Scale className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>Legal Language (MAY/MUST/SHALL)</span>
+                </Link>
                 <Link
                   href={`/app/document/${doc.id}/risks`}
                   className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-red-50 hover:bg-red-100 text-red-800 border border-red-200 text-xs font-semibold transition-colors"

@@ -46,7 +46,9 @@ function heuristicDocumentAnalysis(
 
   // Detect document type
   let documentType = 'Commercial Agreement';
-  if (textLower.includes('employment') || textLower.includes('employee') || textLower.includes('employer')) {
+  if (textLower.includes('software services agreement')) {
+    documentType = 'Software Services Agreement';
+  } else if (textLower.includes('employment') || textLower.includes('employee') || textLower.includes('employer')) {
     documentType = 'Employment Agreement';
   } else if (textLower.includes('lease') || textLower.includes('landlord') || textLower.includes('tenant')) {
     documentType = 'Commercial Lease Agreement';
@@ -60,8 +62,14 @@ function heuristicDocumentAnalysis(
 
   // Detect Parties
   const parties: { name: string; role: string }[] = [];
+  const clientMatch = rawText.match(/\bClient\s*[:\s]?\s*([A-Za-z0-9\s,\.]+?(?:Pvt\.?\s*Ltd\.?|Ltd\.?|Inc\.?|LLC|Corporation|Company)?)(?=\r?\n|$)/i);
+  const providerMatch = rawText.match(/\bService\s+Provider\s*[:\s]?\s*([A-Za-z0-9\s,\.]+?(?:Pvt\.?\s*Ltd\.?|Ltd\.?|Inc\.?|LLC|Corporation|Company)?)(?=\r?\n|$)/i);
   const betweenMatch = rawText.match(/between\s+([A-Z0-9\s,\.]+?)\s+(?:\(|,)?\s*["“']?([A-Za-z0-9\s]+)["”']?\s*(?:\)|,)?\s+and\s+([A-Z0-9\s,\.]+?)\s+(?:\(|,)?\s*["“']?([A-Za-z0-9\s]+)["”']?/i);
-  if (betweenMatch) {
+
+  if (clientMatch && providerMatch) {
+    parties.push({ name: clientMatch[1].trim(), role: 'Client' });
+    parties.push({ name: providerMatch[1].trim(), role: 'Service Provider' });
+  } else if (betweenMatch) {
     parties.push({ name: betweenMatch[1].trim(), role: betweenMatch[2]?.trim() || 'First Party' });
     parties.push({ name: betweenMatch[3].trim(), role: betweenMatch[4]?.trim() || 'Second Party' });
   } else {
@@ -77,13 +85,17 @@ function heuristicDocumentAnalysis(
 
   // Detect Governing Jurisdiction
   let jurisdiction = 'Not explicitly specified in document';
-  const jurisMatch = rawText.match(/(?:governed by|governed under|laws of|jurisdiction of|courts of)\s+(?:the\s+)?(?:laws of\s+)?(?:the\s+)?(State of [A-Za-z]+|[A-Za-z]+ State|[A-Za-z]+ County|Commonwealth of [A-Za-z]+|District of Columbia)/i);
-  if (jurisMatch) {
+  const directJurisMatch = rawText.match(/\bJurisdiction\s*[:\s]?\s*([A-Za-z0-9\s,\.]+?)(?=\r?\n|$)/i);
+  const jurisMatch = rawText.match(/(?:governed by|governed under|laws of|jurisdiction of|courts of)\s+(?:the\s+)?(?:laws of\s+)?(?:the\s+)?(State of [A-Za-z]+|[A-Za-z]+ State|[A-Za-z]+ County|Commonwealth of [A-Za-z]+|District of Columbia|India|applicable in India)/i);
+
+  if (directJurisMatch) {
+    jurisdiction = directJurisMatch[1].trim();
+  } else if (jurisMatch) {
     jurisdiction = jurisMatch[1].trim();
   }
 
   // Detect Dates
-  const effectiveMatch = rawText.match(/(?:effective as of|dated as of|entered into as of)\s+([A-Za-z]+ \d{1,2}, \d{4}|\d{1,2}\/\d{1,2}\/\d{4})/i);
+  const effectiveMatch = rawText.match(/(?:effective as of|dated as of|entered into as of|effective date\s*[:\s]?)\s*([0-9]{1,2}\s+[A-Za-z]+\s+[0-9]{4}|[A-Za-z]+\s+[0-9]{1,2},?\s+[0-9]{4}|\d{1,2}\/\d{1,2}\/\d{4})/i);
   const effectiveDate = effectiveMatch ? effectiveMatch[1] : 'Date not explicitly specified';
 
   // Build Clauses and Risks based on pattern matching
@@ -91,7 +103,39 @@ function heuristicDocumentAnalysis(
   const risks: LegalRisk[] = [];
   const obligations: LegalObligation[] = [];
 
-  // 1. Check Non-Compete / Restrictive Covenants
+  // 1. Check Fees & Payment
+  if (textLower.includes('fees and payment') || textLower.includes('payment') || textLower.includes('payable within') || textLower.includes('service fee') || textLower.includes('invoices')) {
+    const quote = extractSnippetContaining(rawText, ['invoices are payable', 'payable within', 'monthly service fee', 'fees and payment', 'payment'], 180);
+    clauses.push({
+      id: 'c-payment',
+      title: 'Fees, Invoicing & Payment Deadlines',
+      category: 'Payment',
+      originalText: quote,
+      plainEnglishTranslation:
+        'Defines invoice payment timelines, service fee amounts, and interest charges assessed against overdue balances.',
+      sourceSection: 'Fees and Payment',
+      pageOrRef: 'Section Reference',
+      severity: 'medium',
+      confidence: 94,
+      suggestedAction: 'Track invoice receipt dates and ensure operational processes support the required payment window.',
+    });
+    risks.push({
+      id: 'r-payment',
+      category: 'payment',
+      severity: 'medium',
+      title: 'Defined Invoice Payment Window & Overdue Interest',
+      explanation:
+        'The contract establishes a firm payment period and allows interest charges on overdue amounts. Delays in invoice approval could trigger interest penalties.',
+      sourceSection: 'Fees and Payment',
+      pageOrRef: 'Section Reference',
+      quote: quote,
+      confidence: 92,
+      reviewRecommendation: 'Verify whether the invoice approval process fits within the specified payment window.',
+      suggestedQuestionForLawyer: 'Can we negotiate a cure or grace period before late interest charges begin accruing?',
+    });
+  }
+
+  // 2. Check Non-Compete / Restrictive Covenants
   if (textLower.includes('non-compete') || textLower.includes('not engage in') || textLower.includes('competing')) {
     const quote = extractSnippetContaining(rawText, ['non-compete', 'competing', 'not engage in'], 150);
     clauses.push({
@@ -123,7 +167,7 @@ function heuristicDocumentAnalysis(
     });
   }
 
-  // 2. Check Liability & Indemnification
+  // 3. Check Liability & Indemnification
   if (textLower.includes('limitation of liability') || textLower.includes('aggregate liability') || textLower.includes('indemnif')) {
     const quote = extractSnippetContaining(rawText, ['limitation of liability', 'aggregate liability', 'indemnif'], 160);
     const isAsymmetric = textLower.includes('solely to') || textLower.includes('customer liability');
@@ -155,7 +199,7 @@ function heuristicDocumentAnalysis(
     });
   }
 
-  // 3. Check Termination Rights
+  // 4. Check Termination Rights
   if (textLower.includes('termination') || textLower.includes('terminate') || textLower.includes('at-will')) {
     const quote = extractSnippetContaining(rawText, ['termination', 'terminate', 'at-will'], 150);
     clauses.push({
@@ -275,6 +319,102 @@ function heuristicDocumentAnalysis(
     });
   }
 
+  // 7. Check Data Protection & Personal Data
+  if (textLower.includes('data protection') || textLower.includes('personal data') || textLower.includes('security incident')) {
+    const quote = extractSnippetContaining(rawText, ['data protection', 'personal data', 'security incident', 'safeguards'], 160);
+    clauses.push({
+      id: 'c-data-protection',
+      title: 'Data Protection & Security Incident Safeguards',
+      category: 'Privacy/Data',
+      originalText: quote,
+      plainEnglishTranslation:
+        'Requires reasonable administrative and technical security safeguards for processed data and mandates prompt notification following security incidents.',
+      sourceSection: 'Data Protection',
+      pageOrRef: 'Section Reference',
+      severity: 'medium',
+      confidence: 93,
+      suggestedAction: 'Ensure incident notification timelines and standard security requirements match your data compliance policies.',
+    });
+    risks.push({
+      id: 'r-data-protection',
+      category: 'privacy/data',
+      severity: 'medium',
+      title: 'Data Security Breach & Notification Obligation',
+      explanation:
+        'The agreement imposes mandatory breach notification and technical safeguard duties. Failure to notify without undue delay could lead to liability or regulatory exposure.',
+      sourceSection: 'Data Protection',
+      pageOrRef: 'Section Reference',
+      quote: quote,
+      confidence: 91,
+      reviewRecommendation: 'Confirm internal incident response procedures align with the notification requirement.',
+      suggestedQuestionForLawyer: 'What constitutes a confirmed security incident triggering immediate counterparty notification?',
+    });
+  }
+
+  // 8. Check Intellectual Property
+  if (textLower.includes('intellectual property') || textLower.includes('deliverables') || textLower.includes('pre-existing')) {
+    const quote = extractSnippetContaining(rawText, ['intellectual property', 'deliverables', 'pre-existing'], 160);
+    clauses.push({
+      id: 'c-ip',
+      title: 'Intellectual Property & Deliverables Assignment',
+      category: 'Intellectual Property',
+      originalText: quote,
+      plainEnglishTranslation:
+        'Pre-existing IP remains with the creator; project-specific deliverables are assigned to the client only upon full payment, excluding reusable tools and libraries.',
+      sourceSection: 'Intellectual Property',
+      pageOrRef: 'Section Reference',
+      severity: 'medium',
+      confidence: 94,
+      suggestedAction: 'Ensure payment conditions are fulfilled so title to bespoke project deliverables properly transfers.',
+    });
+    risks.push({
+      id: 'r-ip',
+      category: 'unusual obligations',
+      severity: 'medium',
+      title: 'Deliverables Assignment Conditioned on Full Payment',
+      explanation:
+        'Ownership of custom deliverables does not transfer until full payment is received. Disputed invoices could impede ownership of software deliverables.',
+      sourceSection: 'Intellectual Property',
+      pageOrRef: 'Section Reference',
+      quote: quote,
+      confidence: 92,
+      reviewRecommendation: 'Review invoice payment schedules to avoid clouds on deliverable IP title.',
+      suggestedQuestionForLawyer: 'Does withholding disputed payments delay or jeopardize title transfer of project deliverables?',
+    });
+  }
+
+  // 9. Check Governing Law & Dispute Resolution (when no arbitration was detected)
+  if (!clauses.some((c) => c.category === 'Dispute Resolution') && (textLower.includes('governing law') || textLower.includes('dispute resolution') || textLower.includes('jurisdiction'))) {
+    const quote = extractSnippetContaining(rawText, ['governing law', 'dispute resolution', 'jurisdiction', 'courts'], 160);
+    clauses.push({
+      id: 'c-governing-law',
+      title: 'Governing Law & Dispute Resolution Procedure',
+      category: 'Dispute Resolution',
+      originalText: quote,
+      plainEnglishTranslation:
+        'Defines governing jurisdiction and mandates good-faith negotiation before submitting disputes to local courts.',
+      sourceSection: 'Governing Law',
+      pageOrRef: 'Section Reference',
+      severity: 'low',
+      confidence: 92,
+      suggestedAction: 'Confirm the specified jurisdiction and good-faith negotiation timelines are acceptable.',
+    });
+    risks.push({
+      id: 'r-governing-law',
+      category: 'dispute resolution',
+      severity: 'low',
+      title: 'Designated Legal Forum & Negotiation Prerequisite',
+      explanation:
+        'Disputes must be litigated in the designated local courts following a mandatory negotiation window.',
+      sourceSection: 'Governing Law',
+      pageOrRef: 'Section Reference',
+      quote: quote,
+      confidence: 90,
+      reviewRecommendation: 'Verify litigation logistics in the designated forum.',
+      suggestedQuestionForLawyer: 'Does the mandatory good-faith negotiation window prevent emergency injunctive relief?',
+    });
+  }
+
   // Default fallback clause if none matched
   if (clauses.length === 0) {
     const sampleQuote = lines.slice(0, 3).join(' ');
@@ -300,6 +440,17 @@ function heuristicDocumentAnalysis(
     isRecurring: true,
     sourceSection: 'Operational Terms',
   });
+  if (clauses.some((c) => c.category === 'Payment')) {
+    obligations.push({
+      id: 'obl-payment',
+      party: parties[0]?.name || 'Client',
+      description: 'Settle monthly invoices within the agreed payment window (e.g., within 30 days of receipt).',
+      deadline: 'Within invoice due period',
+      isRecurring: true,
+      consequences: 'Potential interest accrual on overdue balances',
+      sourceSection: 'Fees and Payment',
+    });
+  }
   if (risks.some((r) => r.category === 'renewal')) {
     obligations.push({
       id: 'obl-renewal',

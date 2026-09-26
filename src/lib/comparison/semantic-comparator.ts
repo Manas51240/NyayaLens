@@ -324,6 +324,38 @@ export function compareDocumentsSemantically(
     additions.push(`Added liquidated damages assessment (${liqB.attributes.amount || '$100,000'}).`);
   }
 
+  // Compare Invoice Payment Windows
+  const invA = payA.find((p) => p.title === 'Invoice Payment Due Window');
+  const invB = payB.find((p) => p.title === 'Invoice Payment Due Window');
+
+  if (invA && invB && invA.normalizedValue !== invB.normalizedValue) {
+    const delta: SemanticDeltaItem = {
+      id: 'delta-payment-invoice-window',
+      category: 'payment',
+      title: 'Invoice Payment Due Window Modification',
+      description: `Payment window adjusted from ${invA.normalizedValue} to ${invB.normalizedValue}.`,
+      docAContent: invA.verbatimSnippet,
+      docBContent: invB.verbatimSnippet,
+      sourceRefA: invA.sourceSection,
+      sourceRefB: invB.sourceSection,
+      quoteA: invA.verbatimSnippet,
+      quoteB: invB.verbatimSnippet,
+      reviewPriority: 'medium',
+      objectiveExplanation:
+        `The contractual deadline for invoice settlement has shifted from ${invA.normalizedValue} to ${invB.normalizedValue}, impacting cash flow and accounts payable schedules.`,
+      counselDiscussionPrompt:
+        'Verify whether your accounts payable schedule can comfortably meet the adjusted payment due period.',
+    };
+    deltasByDimension.payment.push(delta);
+    changedFinancialObligations.push({
+      description: 'Invoice Settlement Due Window',
+      docA: invA.normalizedValue,
+      docB: invB.normalizedValue,
+      sourceRefA: invA.sourceSection,
+      sourceRefB: invB.sourceSection,
+    });
+  }
+
   // -------------------------------------------------------------
   // 5. Dimension: Termination & Notice Rights
   // -------------------------------------------------------------
@@ -336,8 +368,8 @@ export function compareDocumentsSemantically(
       category: 'termination',
       title: 'Termination Protocol & Notice Delta',
       description: `Termination notice terms altered: ${termA.normalizedValue} vs ${termB.normalizedValue}.`,
-      docAContent: termA.verbatimSnippet,
-      docBContent: termB.verbatimSnippet,
+      docAContent: `${termA.normalizedValue}: ${termA.verbatimSnippet}`,
+      docBContent: `${termB.normalizedValue}: ${termB.verbatimSnippet}`,
       sourceRefA: termA.sourceSection,
       sourceRefB: termB.sourceSection,
       quoteA: termA.verbatimSnippet,

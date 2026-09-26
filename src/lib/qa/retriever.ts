@@ -3,16 +3,19 @@ import { IntentClassificationResult, RetrievalResult, RetrievedEvidenceItem } fr
 
 // Legal query expansion synonym dictionary
 const LEGAL_SYNONYM_MAP: Record<string, string[]> = {
-  termination: ['cancel', 'terminate', 'default', 'expiration', 'breach', 'notice', 'without cause'],
-  terminate: ['termination', 'cancel', 'default', 'expiration', 'notice'],
+  termination: ['cancel', 'terminate', 'default', 'expiration', 'breach', 'notice', 'without cause', 'convenience', 'insolvent', 'cure'],
+  terminate: ['termination', 'cancel', 'default', 'expiration', 'notice', 'convenience', 'cure'],
   'non-compete': ['non-solicitation', 'restrictive covenant', 'competing', 'not engage in'],
   noncompete: ['non-solicitation', 'restrictive covenant', 'competing', 'not engage in'],
   liability: ['damages', 'limitation of liability', 'aggregate liability', 'indemnification', 'cap'],
   rent: ['base rent', 'additional rent', 'triple net', 'operating expenses', 'monthly rent'],
-  payment: ['invoices', 'fees', 'compensation', 'base salary', 'payable'],
+  payment: ['invoices', 'fees', 'compensation', 'base salary', 'payable', 'due period', 'due date', 'overdue', 'interest'],
+  due: ['payable', 'due date', 'due period', 'within', 'receipt', 'invoices'],
+  period: ['within', 'days', 'months', 'timeline', 'deadline', 'notice'],
   arbitration: ['dispute resolution', 'jams', 'binding arbitration', 'jury trial', 'class action'],
   severance: ['salary continuation', 'release of claims', 'termination without cause'],
   confidentiality: ['confidential information', 'proprietary', 'non-disclosure', 'trade secret'],
+  ip: ['intellectual property', 'deliverables', 'inventions', 'ownership', 'copyright'],
 };
 
 import { getOrBuildDocumentIndex } from './document-indexer';
@@ -184,20 +187,34 @@ export function retrieveEvidence(
     if (seenTexts.has(cleanSnippet)) continue;
     seenTexts.add(cleanSnippet);
 
-    const maxQuoteLength = 320;
-    const truncatedQuote = cleanSnippet.length > maxQuoteLength
-      ? cleanSnippet.substring(0, maxQuoteLength).trim() + '...'
-      : cleanSnippet;
+    const maxQuoteLength = 450;
+    let quoteSnippet = cleanSnippet;
+    if (cleanSnippet.length > maxQuoteLength) {
+      let bestIndex = -1;
+      for (const t of item.matchedTerms) {
+        const idx = cleanSnippet.toLowerCase().indexOf(t.toLowerCase());
+        if (idx !== -1 && (bestIndex === -1 || idx < bestIndex)) {
+          bestIndex = idx;
+        }
+      }
+      if (bestIndex > 100) {
+        const start = Math.max(0, bestIndex - 60);
+        const end = Math.min(cleanSnippet.length, start + maxQuoteLength);
+        quoteSnippet = (start > 0 ? '...' : '') + cleanSnippet.substring(start, end).trim() + (end < cleanSnippet.length ? '...' : '');
+      } else {
+        quoteSnippet = cleanSnippet.substring(0, maxQuoteLength).trim() + '...';
+      }
+    }
 
     const normalizedScore = Number(Math.min(1.0, item.score / 20).toFixed(2));
 
     topEvidence.push({
       id: `ev-${topEvidence.length + 1}`,
-      quote: truncatedQuote,
+      quote: quoteSnippet,
       sectionTitle: item.sectionTitle,
       relevanceScore: normalizedScore,
       matchType: item.score >= 10 ? 'exact' : 'semantic',
-      tokenCount: Math.ceil(truncatedQuote.length / 4),
+      tokenCount: Math.ceil(quoteSnippet.length / 4),
     });
 
     if (topEvidence.length >= 3) break;

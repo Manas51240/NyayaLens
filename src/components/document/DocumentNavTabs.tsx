@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { FileText, Radar, MessageSquareText, CheckSquare, Briefcase } from 'lucide-react';
+import { FileText, Radar, MessageSquareText, CheckSquare, Briefcase, Scale } from 'lucide-react';
 
 interface DocumentNavTabsProps {
   documentId: string;
@@ -32,6 +32,12 @@ export const DocumentNavTabs: React.FC<DocumentNavTabsProps> = ({ documentId, ri
       href: `/app/document/${documentId}/ask`,
       icon: MessageSquareText,
       active: pathname === `/app/document/${documentId}/ask`,
+    },
+    {
+      label: 'Legal Language (MAY/MUST/SHALL)',
+      href: `/app/document/${documentId}/language`,
+      icon: Scale,
+      active: pathname === `/app/document/${documentId}/language`,
     },
     {
       label: 'Action Plan',
